@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PetriNet</title>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', (event) => {
+            var socket = io.connect('http://' + document.domain + ':' + location.port);
+
+            socket.on('connect', function () {
+                appendMessage('Connected to server');
+            });
+
+            socket.on('disconnect', function () {
+                appendMessage('Disconnected from server');
+            });
+
+            socket.on('error', function (error) {
+                appendMessage('Error: ' + error);
+            });
+
+            socket.on('message', function (message) {
+                appendMessage(message);
+            });
+
+            socket.on('update', function (json) {
+                appendMessage(JSON.stringify(json));
+            });
+
+            function appendMessage(message) {
+                var chatBox = document.getElementById('chat-box');
+                var messageElement = document.createElement('p');
+                messageElement.textContent = message;
+                chatBox.appendChild(messageElement);
+            }
+
+            function run() {
+                let colors_json = {
+                    "Color1": {
+                        "class_name": "Humans",
+                        "attributes": [
+                            {"attribute_name": "attribute11", "attribute_value": "1"},
+                            {"attribute_name": "attribute12", "attribute_value": "'value1'"}
+                        ],
+                        "functions": [
+                            {"function_name": "function11", "function_core": "return self.attribute11"},
+                            {"function_name": "function12", "function_core": "print(self.attribute12)"}
+                        ]
+                    },
+                    "Color2": {
+                        "class_name": "Animals",
+                        "attributes": [
+                            {"attribute_name": "attribute21", "attribute_value": "2"},
+                            {"attribute_name": "attribute22", "attribute_value": "'value2'"}
+                        ],
+                        "functions": [
+                            {"function_name": "function21", "function_core": "return self.attribute21"},
+                            {"function_name": "function22", "function_core": "print(self.attribute22)"}
+                        ]
+                    }
+                };
+                let places_json = {
+                    'Place1': {
+                        'Color1': {
+                            'Tokens_nbr': 2,
+                            'Action': "function11"
+                        },
+                        'Color2': {
+                            'Tokens_nbr': 1,
+                            'Action': "function21"
+                        }
+                    },
+                    'Place2': {
+                        'Color1': {
+                            'Tokens_nbr': 0,
+                            'Action': "function12"
+                        },
+                        'Color2': {
+                            'Tokens_nbr': 0,
+                            'Action': "function22"
+                        }
+                    }
+                };
+                let transitions_json = {
+                    'Transition1': {
+                        'Token_Consumption': {
+                            'Place1': {
+                                'Color1': 1,
+                                'Color2': 1
+                            },
+                            'Place2': {
+                                'Color2': 1
+                            }
+                        },
+                        'Triggering_Event': 'True',
+                        'Token_Production': {
+                            'Place2': {
+                                'Color1': 2,
+                                'Color2': 1
+                            }
+                        }
+                    },
+                    'Transition2': {
+                        'Token_Consumption': {
+                            'Place1': {
+                                'Color1': 1,
+                                'Color2': 1
+                            }
+                        },
+                        'Triggering_Event': 'True',
+                        'Token_Production': {
+                            'Place2': {
+                                'Color1': 1,
+                                'Color2': 1
+                            }
+                        }
+                    }
+                };
+                socket.emit('run', {'colors': colors_json, 'places': places_json, 'transitions': transitions_json});
+            }
+
+            function pauseAlgorithm() {
+                socket.emit('pause');
+            }
+
+            function resumeAlgorithm() {
+                socket.emit('resume');
+            }
+
+            document.getElementById('run').addEventListener('click', run);
+            document.getElementById('pauseButton').addEventListener('click', pauseAlgorithm);
+            document.getElementById('resumeButton').addEventListener('click', resumeAlgorithm);
+        });
+    </script>
+</head>
+<body>
+<h1>Socket.IO Client</h1>
+<button id="pauseButton">Pause Algorithm</button>
+<button id="resumeButton">Resume Algorithm</button>
+<button id="run">run</button>
+<div id="chat-box" style="border: 1px solid #ccc; padding: 10px; margin-top: 10px;"></div>
+</body>
+</html>

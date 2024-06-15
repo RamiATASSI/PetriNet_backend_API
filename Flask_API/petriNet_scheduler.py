@@ -1,31 +1,19 @@
-from apscheduler.schedulers.background import BackgroundScheduler
+from flask_socketio import SocketIO
 
-from PetriNet_algo.petriNet import PetriNet
 from PetriNet_algo.objects import jsons_to_objects, objects_to_jsons
+from PetriNet_algo.petriNet import PetriNet
+
 
 
 class PetriNetScheduler(PetriNet):
-    def __init__(self, json, emit_func):
+    def __init__(self, json, user_id, socketio: SocketIO):
         super().__init__(*self._json_to_objects(json))
-        self.scheduler = BackgroundScheduler()
-        self.emit_func = emit_func
-
-    def run_thread(self, tic_time=1):
-        self.scheduler.add_job(self.tic, 'interval', seconds=tic_time)
-        self.scheduler.start()
-
-    def pause(self):
-        self.scheduler.pause()
-
-    def resume(self):
-        self.scheduler.resume()
-
-    def stop(self):
-        self.scheduler.shutdown()
+        self.user_id = user_id
+        self.socketio = socketio
 
     def tic(self):
         super().tic()
-        self.emit_func('update', self._get_state())
+        self.socketio.emit('update', self._get_state(), room=self.user_id)
 
     def _get_state(self):
         return self._objects_to_json(self.places, self.transitions)
