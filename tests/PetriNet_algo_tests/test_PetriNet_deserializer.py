@@ -2,7 +2,7 @@ import io
 import sys
 import unittest
 
-from PetriNet_algo.deserializer import ColorDeserializer
+from src.PetriNet_algo.deserializer import ColorDeserializer
 
 if __name__ == '__main__':
     unittest.main()

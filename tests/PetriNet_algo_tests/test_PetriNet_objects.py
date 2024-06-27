@@ -1,6 +1,6 @@
 import unittest
 
-from PetriNet_algo.objects import Place, Transition, jsons_to_objects, objects_to_jsons
+from src.PetriNet_algo.objects import Place, Transition, jsons_to_objects, objects_to_jsons
 
 if __name__ == '__main__':
     unittest.main()

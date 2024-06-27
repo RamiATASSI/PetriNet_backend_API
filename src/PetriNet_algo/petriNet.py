@@ -3,9 +3,7 @@ import time
 
 import numpy as np
 
-from .objects import jsons_to_objects
-
-verbose_level = 1
+verbose_level = 0
 
 
 class PetriNet:
@@ -71,8 +69,9 @@ class PetriNet:
 
         for transition in self.sensitive_transitions:
             if transition.check_triggered():
-                print("Transition " + str(transition) + " with condition " +
-                      transition.triggering_event + " triggered")
+                if verbose_level:
+                    print("Transition " + str(transition) + " with condition " +
+                          transition.triggering_event + " triggered")
 
                 self.triggered_transitions.append(transition)
                 self.sensitive_transitions.remove(transition)

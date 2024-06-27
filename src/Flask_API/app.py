@@ -1,9 +1,9 @@
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit
 from flask_apscheduler import APScheduler
-from petriNet_scheduler import PetriNetScheduler
+from .petriNet_scheduler import PetriNetScheduler
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder='templates')
 socketio = SocketIO(app)
 scheduler = APScheduler()
 scheduler.init_app(app)
@@ -42,7 +42,7 @@ def handle_run(json):
     petriNet = PetriNetScheduler(json=json, user_id=user_id, socketio=socketio)
     # Start algorithm in a separate thread
     job_id = f'feedback_job_{user_id}'
-    scheduler.add_job(id=job_id, func=petriNet.tic, trigger='interval', seconds=5)
+    scheduler.add_job(id=job_id, func=petriNet.tic, trigger='interval', seconds=2)
     active_PetriNets[user_id] = petriNet  # Store algorithm instance for the user
     emit('message', 'Algorithm started successfully', room=user_id)
 
@@ -80,3 +80,5 @@ def has_active_petriNet(user_id):
 
 if __name__ == '__main__':
     socketio.run(app, debug=True)  # Run the Flask app with SocketIO
+
+

@@ -1,7 +1,7 @@
 from flask_socketio import SocketIO
 
-from PetriNet_algo.objects import jsons_to_objects, objects_to_jsons
-from PetriNet_algo.petriNet import PetriNet
+from src.PetriNet_algo.objects import jsons_to_objects, objects_to_jsons
+from src.PetriNet_algo.petriNet import PetriNet
 
 
 
