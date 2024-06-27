@@ -1,1 +1,1 @@
-web: python -m src.Flask_API.app
+web: python -m run

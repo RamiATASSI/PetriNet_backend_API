@@ -1,21 +1,9 @@
-from flask import Flask, render_template, request
-from flask_socketio import SocketIO, emit
-from flask_apscheduler import APScheduler
+from flask import request
+from flask_socketio import emit
+from .extensions import socketio, scheduler
 from .petriNet_scheduler import PetriNetScheduler
 
-app = Flask(__name__, template_folder='templates')
-socketio = SocketIO(app)
-scheduler = APScheduler()
-scheduler.init_app(app)
-scheduler.start()
-
 active_PetriNets = {}  # Dictionary to store active algorithms keyed by user ID
-
-
-@app.route('/')
-def test():
-    return render_template('index.html')
-
 
 @socketio.on('connect')
 def connect():
@@ -42,7 +30,7 @@ def handle_run(json):
     petriNet = PetriNetScheduler(json=json, user_id=user_id, socketio=socketio)
     # Start algorithm in a separate thread
     job_id = f'feedback_job_{user_id}'
-    scheduler.add_job(id=job_id, func=petriNet.tic, trigger='interval', seconds=2)
+    scheduler.add_job(id=job_id, func=petriNet.tic, trigger='interval', seconds=1)
     active_PetriNets[user_id] = petriNet  # Store algorithm instance for the user
     emit('message', 'Algorithm started successfully', room=user_id)
 
@@ -76,9 +64,3 @@ def no_active_petriNet(user_id):
 
 def has_active_petriNet(user_id):
     return user_id in active_PetriNets
-
-
-if __name__ == '__main__':
-    socketio.run(app, debug=True)  # Run the Flask app with SocketIO
-
-
