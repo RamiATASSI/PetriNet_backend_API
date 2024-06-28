@@ -64,11 +64,11 @@
                 let places_json = {
                     'Place1': {
                         'Color1': {
-                            'Tokens_nbr': 2,
+                            'Tokens_nbr': 3,
                             'Action': "function11"
                         },
                         'Color2': {
-                            'Tokens_nbr': 1,
+                            'Tokens_nbr': 2,
                             'Action': "function21"
                         }
                     },
@@ -85,24 +85,6 @@
                 };
                 let transitions_json = {
                     'Transition1': {
-                        'Token_Consumption': {
-                            'Place1': {
-                                'Color1': 1,
-                                'Color2': 1
-                            },
-                            'Place2': {
-                                'Color2': 1
-                            }
-                        },
-                        'Triggering_Event': 'True',
-                        'Token_Production': {
-                            'Place2': {
-                                'Color1': 2,
-                                'Color2': 1
-                            }
-                        }
-                    },
-                    'Transition2': {
                         'Token_Consumption': {
                             'Place1': {
                                 'Color1': 1,

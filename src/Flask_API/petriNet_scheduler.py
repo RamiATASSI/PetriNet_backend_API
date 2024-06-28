@@ -12,8 +12,8 @@ class PetriNetScheduler(PetriNet):
         self.socketio = socketio
 
     def tic(self):
-        super().tic()
         self.socketio.emit('update', self._get_state(), room=self.user_id)
+        super().tic()
 
     def _get_state(self):
         return self._objects_to_json(self.places, self.transitions)
