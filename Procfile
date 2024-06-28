@@ -1,1 +1,1 @@
-web: gunicorn -k eventlet -w 1 src.Flask_API.app:app
+web: gunicorn -k gevent -w 1 -b 0.0.0.0:$PORT run:app
