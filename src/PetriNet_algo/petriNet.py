@@ -90,7 +90,7 @@ class PetriNet:
                 if verbose_level:
                     print("new sensitive_transitions after resesitizing: ",
                           [str(transition) for transition in self.sensitive_transitions])
-                    self.retrigger()
+                self.retrigger()
                 break
 
     def produce(self):

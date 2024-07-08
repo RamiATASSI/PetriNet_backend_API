@@ -50,22 +50,31 @@ class Transition:
         self.token_production: dict[Place, dict] = {places[key]: value for key, value in
                                                     transition_data.get('Token_Production', {}).items()}
         self.is_sensitized: bool = False
+        self.is_triggered: bool = False
 
     def check_sensitization(self) -> bool:
         if not self.token_consumption:
-            return False
+            return True
         for place, token in self.token_consumption.items():
             for color, weight in token.items():
                 if place.tokens[color] < weight:
                     self.is_sensitized = False
+                    self.is_triggered = False
                     return False
         self.is_sensitized = True
         return True
 
+    def shortcut_trigger_if_sensitized(self):
+        if self.is_sensitized:
+            self.is_triggered = True
+            return True
+        return False
+
     def check_triggered(self) -> bool:
         if self.is_sensitized:
-            if eval(self.triggering_event):
+            if eval(self.triggering_event) or self.is_triggered:
                 self.is_sensitized = False
+                self.is_triggered = False
                 return True
         return False
 
@@ -124,16 +133,13 @@ def objects_to_jsons(places: dict[Place], transitions: dict[Transition]):
         for color, token_count in place.tokens.items():
             place_data[color] = {
                 'Tokens_nbr': token_count,
-                'Action': place.action[color]
             }
         places_json[place_name] = place_data
 
     transitions_json = {}
     for transition_name, transition in transitions.items():
         transition_data = {
-            'Token_Consumption': {str(place): value for place, value in transition.token_consumption.items()},
-            'Triggering_Event': transition.triggering_event,
-            'Token_Production': {str(place): value for place, value in transition.token_production.items()},
+            'Is_Sensitized': transition.is_sensitized,
         }
         transitions_json[transition_name] = transition_data
 

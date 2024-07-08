@@ -25,8 +25,12 @@
                 appendMessage(message);
             });
 
+            socket.on('set_up', function (json) {
+                appendMessage('Initial Petrinet recieved : ' +JSON.stringify(json));
+            });
+
             socket.on('update', function (json) {
-                appendMessage(JSON.stringify(json));
+                appendMessage('Updated Petrinet recieved : ' +JSON.stringify(json));
             });
 
             function appendMessage(message) {
@@ -91,7 +95,7 @@
                                 'Color2': 1
                             }
                         },
-                        'Triggering_Event': 'True',
+                        'Triggering_Event': 'False',
                         'Token_Production': {
                             'Place2': {
                                 'Color1': 1,
@@ -100,7 +104,13 @@
                         }
                     }
                 };
-                socket.emit('run', {'colors': colors_json, 'places': places_json, 'transitions': transitions_json});
+                let full_json = {
+                    'colors': colors_json,
+                    'places': places_json,
+                    'transitions': transitions_json
+                };
+                socket.emit('run', full_json);
+                appendMessage('Initial Petrinet sent : ' + JSON.stringify(full_json));
             }
 
             function pauseAlgorithm() {
@@ -110,18 +120,28 @@
             function resumeAlgorithm() {
                 socket.emit('resume');
             }
+            function endAlgorithm() {
+                socket.emit('end');
+            }
 
+            function triggerTransition1() {
+                socket.emit('transition_trigger', "Transition1");
+            }
             document.getElementById('run').addEventListener('click', run);
+            document.getElementById('transition1').addEventListener('click', triggerTransition1);
             document.getElementById('pauseButton').addEventListener('click', pauseAlgorithm);
             document.getElementById('resumeButton').addEventListener('click', resumeAlgorithm);
+            document.getElementById('endButton').addEventListener('click', endAlgorithm);
         });
     </script>
 </head>
 <body>
 <h1>Socket.IO Client</h1>
-<button id="pauseButton">Pause Algorithm</button>
-<button id="resumeButton">Resume Algorithm</button>
 <button id="run">run</button>
+<button id="pauseButton">Pause</button>
+<button id="resumeButton">Resume</button>
+<button id="endButton">End</button>
+<button id="transition1">Transition1</button>
 <div id="chat-box" style="border: 1px solid #ccc; padding: 10px; margin-top: 10px;"></div>
 </body>
 </html>
