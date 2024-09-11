@@ -8,6 +8,10 @@
     <script>
         document.addEventListener('DOMContentLoaded', (event) => {
             var socket = io.connect();
+            /*
+                To establish an external (web) socket connection, write instead :
+                var socket = io.connect(https://petrinet-api-457dae2a7a71.herokuapp.com/);
+            */
 
             socket.on('connect', function () {
                 appendMessage('Connected to server');
