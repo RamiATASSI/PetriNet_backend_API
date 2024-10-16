@@ -113,10 +113,10 @@ class Transition:
 
 
 def jsons_to_objects(colors_json, places_json, transitions_json):
-    color_deserializer = ColorDeserializer()
+    #color_deserializer = ColorDeserializer()
     colors = {}
-    for color, color_data in colors_json.items():
-        colors[color] = color_deserializer.compile(color_data)
+    #for color, color_data in colors_json.items():
+    #    colors[color] = color_deserializer.compile(color_data)
     places = {}
     for place, place_data in places_json.items():
         places[place] = Place(place, place_data, colors)
