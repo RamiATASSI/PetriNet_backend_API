@@ -9,6 +9,7 @@ active_PetriNets = {}  # Dictionary to store active algorithms keyed by user ID
 def connect():
     user_id = request.sid
     print(f"User {user_id} connected")
+    emit('message', f'Connected to the server : {user_id}', room=user_id)
 
 
 @socketio.on('disconnect')
@@ -38,6 +39,7 @@ def handle_run(json):
 @socketio.on('transition_trigger')
 def handle_transition_trigger(transition_ID):
     user_id = request.sid
+    emit('message', f'Transition triggered : {user_id}', room=user_id)
     if no_active_petriNet(user_id):
         return
     petriNet = active_PetriNets[user_id]
