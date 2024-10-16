@@ -28,12 +28,19 @@ def handle_run(json):
     if has_active_petriNet(user_id):
         emit('error', 'PetriNet is already running for this user', room=user_id)
         return
-    petriNet = PetriNetScheduler(json=json, user_id=user_id, socketio=socketio)
-    # Start algorithm in a separate thread
-    job_id = f'feedback_job_{user_id}'
-    scheduler.add_job(id=job_id, func=petriNet.tic, trigger='interval', seconds=1)
-    active_PetriNets[user_id] = petriNet  # Store algorithm instance for the user
-    emit('message', 'Algorithm started successfully', room=user_id)
+    try:
+        petriNet = PetriNetScheduler(json=json, user_id=user_id, socketio=socketio)
+        # Start algorithm in a separate thread
+        job_id = f'feedback_job_{user_id}'
+        scheduler.add_job(id=job_id, func=petriNet.tic, trigger='interval', seconds=1)
+        active_PetriNets[user_id] = petriNet  # Store algorithm instance for the user
+        emit('message', 'Algorithm started successfully', room=user_id)
+    except Exception as e:
+        # Catch any exceptions and notify the client of the error
+        error_message = f'Error starting PetriNet: {str(e)}'
+        print(error_message)  # Log the error on the server
+        emit('error', error_message, room=user_id)
+
 
 
 @socketio.on('transition_trigger')
