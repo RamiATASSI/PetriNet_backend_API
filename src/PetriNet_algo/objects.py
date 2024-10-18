@@ -5,13 +5,20 @@ from .deserializer import ColorDeserializer
 
 class Place:
     def __init__(self, place_name, place_data: dict, colors: dict[str, Any]):
+        print(f"Initializing Place: {place_name}")
+        print(f"Place Data: {place_data}")
         self.place_name: str = place_name
         self.tokens: dict[str, int] = {}
         self.action: dict[str, str] = {}
         self.colors: dict[str, Any] = colors
+        
         for color, data in place_data.items():
-            self.tokens[color] = data.get('Tokens_nbr', 0)  # Default to 0 if missing
-            self.action[color] = data.get('Action', None)   # Default to None if missing
+            try:
+                print(f"Initializing tokens and actions for color: {color}")
+                self.tokens[color] = data.get('Tokens_nbr', 0)  # Default to 0 if missing
+                self.action[color] = data.get('Action', None)  # Default to None if missing
+            except Exception as e:
+                raise Exception(f"Error initializing color {color}: {e}")
 
     def get_colors(self) -> set[str]:
         return {key for key, value in self.tokens.items() if value > 0}
