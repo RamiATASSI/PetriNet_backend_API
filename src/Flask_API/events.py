@@ -1,4 +1,5 @@
 from flask import request
+import traceback
 from flask_socketio import emit
 from .extensions import socketio, scheduler
 from .petriNet_scheduler import PetriNetScheduler
@@ -38,8 +39,9 @@ def handle_run(json):
     except Exception as e:
         # Catch any exceptions and notify the client of the error
         error_message = f'Error starting PetriNet: {str(e)}'
+        traceback_str = ''.join(traceback.format_exception(None, e, e.__traceback__))
         print(error_message)  # Log the error on the server
-        emit('error', error_message, room=user_id)
+        emit('error', {'error': error_message, 'traceback': traceback_str}, room=user_id)
 
 
 
