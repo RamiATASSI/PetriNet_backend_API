@@ -43,23 +43,33 @@ class ColorDeserializer:
         functions = color_data['functions']
 
         class_code = f"class {class_name}:\n"
+        
+        # Add default __init__ content if no attributes are provided
         class_code += "    def __init__(self):\n"
+        if attributes:
+            for attribute in attributes:
+                attribute_name = attribute['attribute_name']
+                attribute_value = attribute['attribute_value']
+                class_code += f"        self.{attribute_name} = {attribute_value}\n"
+        else:
+            # Default init if no attributes
+            class_code += "        pass\n"
 
-        for attribute in attributes:
-            attribute_name = attribute['attribute_name']
-            attribute_value = attribute['attribute_value']
-            class_code += f"        self.{attribute_name} = {attribute_value}\n"
-
-        for function in functions:
-            function_name = function['function_name']
-            function_core = function['function_core']
-            arguments = function.get('arguments', '')
-            if arguments:
-                arguments = 'self, ' + arguments
-            else:
-                arguments = 'self'
-            class_code += f"    def {function_name}({arguments}):\n"
-            class_code += f"        {function_core}\n"
+        # Add functions if any are provided
+        if functions:
+            for function in functions:
+                function_name = function['function_name']
+                function_core = function['function_core']
+                arguments = function.get('arguments', '')
+                if arguments:
+                    arguments = 'self, ' + arguments
+                else:
+                    arguments = 'self'
+                class_code += f"    def {function_name}({arguments}):\n"
+                class_code += f"        {function_core}\n"
+        else:
+            # Add a placeholder function to avoid syntax errors if no functions are provided
+            class_code += "    pass\n"
 
         return class_code
 
