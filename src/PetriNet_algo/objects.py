@@ -10,8 +10,8 @@ class Place:
         self.action: dict[str, str] = {}
         self.colors: dict[str, Any] = colors
         for color, data in place_data.items():
-            self.tokens[color] = data['Tokens_nbr']
-            self.action[color] = data['Action']
+            self.tokens[color] = data.get('Tokens_nbr', 0)  # Default to 0 if missing
+            self.action[color] = data.get('Action', None)   # Default to None if missing
 
     def get_colors(self) -> set[str]:
         return {key for key, value in self.tokens.items() if value > 0}
@@ -82,20 +82,24 @@ class Transition:
         deleted_colors = {}
         for place, token in self.token_consumption.items():
             for color, weight in token.items():
-                place.add_colored_tokens(color, -weight)
-                if place not in deleted_colors:
-                    deleted_colors[place] = set()
-                deleted_colors[place].add(color)
+                # Only consume tokens if the weight is greater than 0
+                if weight > 0:
+                    place.add_colored_tokens(color, -weight)
+                    if place not in deleted_colors:
+                        deleted_colors[place] = set()
+                    deleted_colors[place].add(color)
         return deleted_colors
 
     def produce_tokens(self) -> dict[Place, set[str]]:
         added_colors = {}
         for place, token in self.token_production.items():
             for color, weight in token.items():
-                place.add_colored_tokens(color, weight)
-                if place not in added_colors:
-                    added_colors[place] = set()
-                added_colors[place].add(color)
+                # Only produce tokens if the weight is greater than 0
+                if weight > 0:
+                    place.add_colored_tokens(color, weight)
+                    if place not in added_colors:
+                        added_colors[place] = set()
+                    added_colors[place].add(color)
         return added_colors
 
     def describe(self) -> None:
@@ -113,10 +117,10 @@ class Transition:
 
 
 def jsons_to_objects(colors_json, places_json, transitions_json):
-    #color_deserializer = ColorDeserializer()
+    color_deserializer = ColorDeserializer()
     colors = {}
-    #for color, color_data in colors_json.items():
-    #    colors[color] = color_deserializer.compile(color_data)
+    for color, color_data in colors_json.items():
+        colors[color] = color_deserializer.compile(color_data)
     places = {}
     for place, place_data in places_json.items():
         places[place] = Place(place, place_data, colors)
