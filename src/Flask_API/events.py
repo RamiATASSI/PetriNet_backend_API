@@ -40,7 +40,7 @@ def handle_run(json):
         # Catch any exceptions and notify the client of the error
         error_message = f'Error starting PetriNet: {str(e)}'
         traceback_str = ''.join(traceback.format_exception(None, e, e.__traceback__))
-        print(error_message)  # Log the error on the server
+        print(error_message, traceback_str)  # Log the error on the server
         emit('error', {'error': error_message, 'traceback': traceback_str}, room=user_id)
 
 
