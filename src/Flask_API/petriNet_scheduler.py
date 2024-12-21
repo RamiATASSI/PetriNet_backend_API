@@ -18,10 +18,24 @@ class PetriNetScheduler(PetriNet):
 
 
     def shortcut_trigger_transition(self, transition_name):
-        if self.transitions[transition_name].shortcut_trigger_if_sensitized():
-            self.socketio.emit('message', "Transition '" + transition_name + "' triggered", room=self.user_id)
-        else:
-            self.socketio.emit('message', "Can't trigger not sensitized transition " + transition_name, room=self.user_id)
+        transition = self.transitions[transition_name]
+        
+        # 1) Check if it’s sensitized
+        transition.check_sensitization()
+        if not transition.is_sensitized:
+            self.socketio.emit('message', f"Can't trigger not sensitized transition {transition_name}", room=self.user_id)
+            return
+
+        # 2) Trigger if sensitized (sets `is_triggered = True`)
+        transition.shortcut_trigger_if_sensitized()
+
+        # 3) Actually consume and produce tokens
+        transition.consume_tokens()
+        transition.produce_tokens()
+
+        # 4) Emit feedback and updated state
+        self.socketio.emit('message', f"Transition '{transition_name}' triggered", room=self.user_id)
+        self.socketio.emit('update', self._get_state(), room=self.user_id)
 
     def _get_state(self):
         return self._objects_to_json(self.places, self.transitions)

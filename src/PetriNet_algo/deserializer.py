@@ -27,7 +27,7 @@ class ColorDeserializer:
 
             return instance
         except SyntaxError:
-            raise SyntaxError("Error: The provided class code is not valid Python code.")
+            raise SyntaxError("Error: The provided class code is not valid Python code. {}".format(class_code))
         except AttributeError:
             raise AttributeError("Error: The class does not have a callable constructor.")
         except TypeError:
