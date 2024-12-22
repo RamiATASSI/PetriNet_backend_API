@@ -54,7 +54,7 @@ class Transition:
         self.transition_name: str = transition_name
         self.token_consumption: dict[Place, dict] = {places[key]: value for key, value in
                                                      transition_data.get('Token_Consumption', {}).items()}
-        self.triggering_event: str = transition_data.get('Triggering_Event', "None")
+        self.triggering_event: str = transition_data.get('Triggering_Event', "True")
         self.token_production: dict[Place, dict] = {places[key]: value for key, value in
                                                     transition_data.get('Token_Production', {}).items()}
         self.is_sensitized: bool = False
@@ -62,13 +62,15 @@ class Transition:
 
     def check_sensitization(self) -> bool:
         if not self.token_consumption:
+            self.is_sensitized = True
             return True
+
         for place, token in self.token_consumption.items():
             for color, weight in token.items():
                 if color not in place.tokens or place.tokens[color] < weight:
                     self.is_sensitized = False
-                    self.is_triggered = False
                     return False
+
         self.is_sensitized = True
         return True
 
@@ -78,53 +80,27 @@ class Transition:
             return True
         return False
 
-    def check_triggered(self) -> bool:
-        if self.is_sensitized:
-            if eval(self.triggering_event) or self.is_triggered:
-                # Once we know the transition is firing, move tokens:
-                self.consume_tokens()
-                self.produce_tokens()
-
-                # Reset flags so this transition doesn’t fire continuously:
-                self.is_sensitized = False
-                self.is_triggered = False
-                return True
-        return False
-
     def consume_tokens(self) -> dict[Place, set[str]]:
         deleted_colors = {}
         for place, token in self.token_consumption.items():
             for color, weight in token.items():
-                # Only consume tokens if the weight is greater than 0
                 if weight > 0:
                     place.add_colored_tokens(color, -weight)
                     if place not in deleted_colors:
                         deleted_colors[place] = set()
                     deleted_colors[place].add(color)
-        emit('message', f'Transition {self.transition_name} consumed tokens: {deleted_colors}', room=self.user_id)
         return deleted_colors
 
     def produce_tokens(self) -> dict[Place, set[str]]:
         added_colors = {}
         for place, token in self.token_production.items():
             for color, weight in token.items():
-                # Only produce tokens if the weight is greater than 0
                 if weight > 0:
                     place.add_colored_tokens(color, weight)
                     if place not in added_colors:
                         added_colors[place] = set()
                     added_colors[place].add(color)
         return added_colors
-
-    def describe(self) -> None:
-        print("Transition name: ", self.transition_name)
-        print("Token consumption: ",
-              ', '.join(f"{str(place)} : {str(token)}" for place, token in self.token_consumption.items()))
-        print("Triggering event: ", self.triggering_event)
-        print("Token production: ",
-              ', '.join(f"{str(place)} : {str(token)}" for place, token in self.token_production.items()))
-        print("Sensitization: ", self.is_sensitized)
-        print()
 
     def __str__(self) -> str:
         return self.transition_name
