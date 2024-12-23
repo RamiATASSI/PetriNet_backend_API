@@ -35,8 +35,9 @@ def handle_run(json):
         return
         
     try:
+        mode = json.get('mode', 'click')
         # Create new PetriNet instance
-        petri_net = PetriNetScheduler(json=json, user_id=user_id, socketio=socketio)
+        petri_net = PetriNetScheduler(json=json, user_id=user_id, socketio=socketio, mode=mode)
         
         # Add to scheduler
         job_id = f'feedback_job_{user_id}'
@@ -50,7 +51,7 @@ def handle_run(json):
         # Store instance
         active_PetriNets[user_id] = petri_net
         
-        emit('message', 'Algorithm started successfully', room=user_id)
+        emit('message', f'Algorithm started in {mode} mode', room=user_id)
         
     except Exception as e:
         error_message = f'Error starting PetriNet: {str(e)}'

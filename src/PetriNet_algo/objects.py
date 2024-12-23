@@ -6,8 +6,6 @@ from flask_socketio import emit
 
 class Place:
     def __init__(self, place_name, place_data: dict, colors: dict[str, Any]):
-        print(f"Initializing Place: {place_name}")
-        print(f"Place Data: {place_data}")
         self.place_name: str = place_name
         self.tokens: dict[str, int] = {}
         self.action: dict[str, str] = {}
@@ -60,6 +58,14 @@ class Transition:
         self.is_sensitized: bool = False
         self.is_triggered: bool = False
 
+        # NEW:
+        print(f"Transitions data : {transition_data}")
+        self.duration = transition_data.get('Duration', 0)  # integer seconds
+        self.time_sensitized = None
+        self.is_sensitized = False
+        self.is_triggered = False
+
+
     def check_sensitization(self) -> bool:
         if not self.token_consumption:
             self.is_sensitized = True
@@ -82,6 +88,7 @@ class Transition:
 
     def consume_tokens(self) -> dict[Place, set[str]]:
         deleted_colors = {}
+        #emit('message', f"Consuming tokens for transition {self.transition_name}")
         for place, token in self.token_consumption.items():
             for color, weight in token.items():
                 if weight > 0:
@@ -93,6 +100,7 @@ class Transition:
 
     def produce_tokens(self) -> dict[Place, set[str]]:
         added_colors = {}
+        #emit('message', f"Producing tokens for transition {self.transition_name}")
         for place, token in self.token_production.items():
             for color, weight in token.items():
                 if weight > 0:
@@ -138,6 +146,9 @@ def objects_to_jsons(places: dict[Place], transitions: dict[Transition]):
         transitions_json[transition_name] = transition_data
 
     return places_json, transitions_json
+
+def _get_state(self):
+        return self.objects_to_json(self.places, self.transitions)
 
 def main() -> None:
     transitions_json = {
