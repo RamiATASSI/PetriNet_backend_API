@@ -1,30 +1,49 @@
-from src.PetriNet_algo.object.place import Place
+from enum import Enum
 
+from src.PetriNet_algo.object.place import Place
+from src.PetriNet_algo.object.token import Token, SuperToken
+
+type PreSet  = dict[list[Place], list[Token | SuperToken]]
+type PostSet = dict[list[Place], list[Token | SuperToken]]
+
+# class syntax
+
+class OperationType(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+
+class TransitionOperation:
+    def __init__(self, preset: PreSet, postset: PostSet, operation_type: OperationType):
+        self.preset = preset
+        self.postset = postset
+        self.operation_type = operation_type
+    # TODO Define the operation that a Transition should be able to do
+
+type TransitionOperations = list[TransitionOperation]
 
 class Transition:
-    def __init__(self, transition_name, transition_data: dict, places: dict[str, Place]):
+    def __init__(self, transition_name, transition_ops: TransitionOperations):
         self.transition_name: str = transition_name
-        self.token_consumption: dict[Place, dict] = {places[key]: value for key, value in
-                                                     transition_data.get('Token_Consumption', {}).items()}
-        self.triggering_event: str = transition_data.get('Triggering_Event', "True")
-        self.token_production: dict[Place, dict] = {places[key]: value for key, value in
-                                                    transition_data.get('Token_Production', {}).items()}
-        self.is_sensitized: bool = False
-        self.is_triggered: bool = False
 
-        # NEW:
-        print(f"Transitions data : {transition_data}")
-        self.duration = transition_data.get('Duration', 0)  # integer seconds
-        self.time_sensitized = None
+        """The index of the TransitionOperation that was used for the trigger"""
+        self.used_map_during_consumption: int = ...
+        """The tokens consumed during the transition trigger"""
+        self.consumed_tokens: list[Token | SuperToken] = list()
+
+
+        self.triggering_event: str = ...
+        self.duration = ...
         self.is_sensitized = False
         self.is_triggered = False
 
 
     def check_sensitization(self) -> bool:
-        if not self.token_consumption:
+        if not self.consumed_tokens:
             self.is_sensitized = True
             return True
 
+        # TODO Update
         for place, token in self.token_consumption.items():
             for color, weight in token.items():
                 if color not in place.tokens or place.tokens[color] < weight:
@@ -41,6 +60,7 @@ class Transition:
         return False
 
     def consume_tokens(self) -> dict[Place, set[str]]:
+        # TODO Update
         deleted_colors = {}
         #emit('message', f"Consuming tokens for transition {self.transition_name}")
         for place, token in self.token_consumption.items():
@@ -53,6 +73,7 @@ class Transition:
         return deleted_colors
 
     def produce_tokens(self) -> dict[Place, set[str]]:
+        # TODO Update
         added_colors = {}
         #emit('message', f"Producing tokens for transition {self.transition_name}")
         for place, token in self.token_production.items():
@@ -65,4 +86,4 @@ class Transition:
         return added_colors
 
     def __str__(self) -> str:
-        return self.transition_name
+        return f"{self.transition_name}(used_map_during_consumption={self.used_map_during_consumption}, consumed_tokens={self.consumed_tokens})"
