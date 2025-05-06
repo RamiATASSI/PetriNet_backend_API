@@ -73,11 +73,50 @@ class SuperToken:
 
 class TypeTree:
     """
-    tree[Token]
-    TODO Documentation
+    Manages the static qualification forest Q.
+    Functions:
+      - is_subtype(sub, super): whether node 'sub' is equal to or nested under another node 'super'.
+      - get_descendants(type_name): list of all type_names in the static subtree whose root is type_name.
     """
-
+    
+    """
+      TODO if we want to dynamically change this forest too, meaning if we want to 
+      let users add new token types or change existing ones while the system is live, need to add proper methods
+    """
     def __init__(self, root_type: Token):
         self.root_type = root_type
+        self._nodes = {}
+        def register(node):
+            self._nodes[node.type_name] = node
+            for child in node.children:
+                register(child)
+        register(root_type)
 
-    # TODO
+    
+    # TODO documentation
+    def is_subtype(self, sub: str, super: str) -> bool:
+        node = self._nodes.get(sub)
+        while node is not None:
+            if node.type_name == super:
+                return True
+            node = getattr(node, 'parent', None)
+        return False
+       
+
+    # TODO documentation
+    def get_descendants(self, type_name: str) -> list[str]:
+        # depth first search to collect all children under type_name node, pre-order traversal to top-down list children
+        start = self._nodes.get(type_name)
+        if start is None:
+            return []
+
+        result = []
+        def dfs(node):
+            result.append(node.type_name)
+            for child in node.children:
+                dfs(child)
+
+        dfs(start)
+        return result
+
+    
