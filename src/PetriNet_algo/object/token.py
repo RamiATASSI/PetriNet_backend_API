@@ -1,75 +1,60 @@
-token_type_names: set[str]
-token_trees = set()
+type Attribute = dict[str, type]
+
+class TokenType:
+    """
+    TODO
+    """
+    def __init__(self, type_name: str):
+        assert(type_name not in type_set)
+        type_set.add(type_name)
+        self.type_name: str = type_name
 
 class Token:
     """
-    Represents a single node in a static type hierarchy.
+    An abstract class representing the tokens inside a Petri Net. Can be either a `SimpleToken` (is purely composed of
+    attributes) or `SuperToken` (can be composed of other Token).
 
-    Each Token defines one unique qualifier type in its type_name field (ex: “Mammal”, “Cat”) 
-    and maintains links to its parent and any child types through its parent and children fields. 
-    Once created, each type_name must be globally unique.
+    Attributes
+    ----------
+    token_type : TokenType
+        the type of the Token.
+    attributes : dict[str, type]
+        the attributes of the token, with their respective (Python) type.
+    """
+    def __init__(self, token_type: TokenType, attributes: Attribute):
+        self.token_type = token_type
+        self.attributes = attributes
 
-    Attributes:
-        type_name (str):   The unique identifier for this qualifier node.
-        attributes (dict): Arbitrary attributes associated with this type.
-        parent (Token|None):  The immediate super-type in the hierarchy, or None if this is a root.
-        children (list[Token]): All immediate sub-types of this token.
+class SimpleToken(Token):
     """
-    def __init__(self, type_name: str, attributes: dict[str, type], parent: "Token"):
-        if type_name not in token_type_names:
-            token_type_names.add(type_name)
-            self.type_name = type_name
-            self.parent = parent
-            self.children = []
-            self.attributes = attributes
-        else:
-            raise KeyError("The type {type_name} already exists".format(type_name=type_name))
+    A `Token` that is purely composed of attributes.
+    Attributes
+    ----------
+    token_type : TokenType
+        the type of the Token.
+    attributes : dict[str, type]
+        the attributes of the token, with their respective (Python) type.
+    """
+    def __init__(self, token_type: TokenType, attributes: dict[str, type]):
+        super().__init__(token_type, attributes)
 
+class SuperToken(Token):
     """
-    Attach this node under a parent in the static tree.
+    A `Token` that can own other Tokens.
+    Attributes
+    ----------
+    token_type : TokenType
+        the type of the Token.
+    attributes : dict[str, type]
+        the attributes of the token, with their respective (Python) type.
+    components : list[Token]
+        the token that are in the `SuperToken`
     """
-    def set_parent(self, parent: "Token"):
-        self.parent = parent
-    """
-    Replace the children (list of sub-nodes) of this node.
-    """
-    def set_children(self, children: list["Token"]):
-        self.children = children
-    """
-    Add a single child (sub-type) under this node.
-    """
-    def add_child(self, child: "Token"):
-        self.children.append(child)
-    """
-    Add multiple children (sub-types) under this node at once.
-    """
-    def add_children(self, children: list["Token"]):
-        self.children.extend(children)
-    """
-    Detach one existing child (sub-type) from this node.
-    """
-    def remove_children(self, children: list["Token"]):
-        self.children.remove(children)
+    def __init__(self, token_type: TokenType, attributes: dict[str, type], components: list[Token]):
+        super().__init__(token_type, attributes)
+        self.components = components
 
-    """
-    Check whether this node's own type_name matches the given string.
-    """
-    def exists(self, type_name: str) -> bool:
-        return type_name in self.type_name
-
-    def __str__(self) -> str:
-        return f"Token(type={self.type_name}, attrs={self.attributes}, parent={self.parent.type_name}, children={len(self.children)})"
-
-
-class SuperToken:
-    """
-    TODO Documentation
-    """
-    def __init__(self, type_name: str, attributes: dict[str, type], content: list[Token]):
-        pass
-
-    # TODO
-
+type_set: set[str] = set[str]()
 
 class TypeTree:
     """
@@ -83,7 +68,7 @@ class TypeTree:
       TODO if we want to dynamically change this forest too, meaning if we want to 
       let users add new token types or change existing ones while the system is live, need to add proper methods
     """
-    def __init__(self, root_type: Token):
+    def __init__(self, root_type: TokenType):
         self.root_type = root_type
         self._nodes = {}
         def register(node):
