@@ -1,42 +1,17 @@
-from enum import Enum
-
 from src.PetriNet_algo.object.place import Place
-from src.PetriNet_algo.object.token import Token, SuperToken
-
-type PreSet  = dict[list[Place], list[Token | SuperToken]]
-type PostSet = dict[list[Place], list[Token | SuperToken]]
-
-# class syntax
-
-class OperationType(Enum):
-    RED = 1
-    GREEN = 2
-    BLUE = 3
-
-class TransitionOperation:
-    def __init__(self, preset: PreSet, postset: PostSet, operation_type: OperationType):
-        self.preset = preset
-        self.postset = postset
-        self.operation_type = operation_type
-    # TODO Define the operation that a Transition should be able to do
-
-type TransitionOperations = list[TransitionOperation]
 
 class Transition:
-    def __init__(self, transition_name, transition_ops: TransitionOperations):
+    def __init__(self, transition_name, transition_conditions: list[Condition], transition_ops: list[OperationType]):
         self.transition_name: str = transition_name
+        self.transition_conditions: list[Condition] = transition_conditions
+        self.transition_ops: list[OperationType] = transition_ops
 
-        """The index of the TransitionOperation that was used for the trigger"""
-        self.used_map_during_consumption: int = ...
-        """The tokens consumed during the transition trigger"""
-        self.consumed_tokens: list[Token | SuperToken] = list()
-
+        self.token_consumed_from_places = list()
 
         self.triggering_event: str = ...
         self.duration = ...
         self.is_sensitized = False
         self.is_triggered = False
-
 
     def check_sensitization(self) -> bool:
         if not self.consumed_tokens:

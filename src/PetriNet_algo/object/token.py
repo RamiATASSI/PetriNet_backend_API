@@ -1,3 +1,5 @@
+from abc import abstractmethod
+
 type Attribute = dict[str, type]
 
 class TokenType:
@@ -24,6 +26,9 @@ class Token:
     def __init__(self, token_type: TokenType, attributes: Attribute):
         self.token_type = token_type
         self.attributes = attributes
+    @abstractmethod
+    def is_super_token(self) -> bool:
+        pass
 
 class SimpleToken(Token):
     """
@@ -37,6 +42,8 @@ class SimpleToken(Token):
     """
     def __init__(self, token_type: TokenType, attributes: dict[str, type]):
         super().__init__(token_type, attributes)
+    def is_super_token(self) -> bool:
+        return False
 
 class SuperToken(Token):
     """
@@ -53,6 +60,8 @@ class SuperToken(Token):
     def __init__(self, token_type: TokenType, attributes: dict[str, type], components: list[Token]):
         super().__init__(token_type, attributes)
         self.components = components
+    def is_super_token(self) -> bool:
+        return True
 
 type_set: set[str] = set[str]()
 
