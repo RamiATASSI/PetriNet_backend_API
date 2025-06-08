@@ -62,6 +62,25 @@ class SuperToken(Token):
         self.components = components
     def is_super_token(self) -> bool:
         return True
+    def merge(self, other: Token) -> 'SuperToken':
+       # take token in the process of merging (other) and and set its parent as the supertoken (self)
+       other.parent = self
+       # append token (other) to the supertoken's (self) components list: supertoken owns the token
+       self.components.append(other)
+       # return supertoken
+       return self
+    def split(self, selector: callable[['SuperToken'], Token]) -> ('SuperToken', Token):
+        # use selector to choose which component to pull out
+        comp = selector(self)
+        # raise error for invalid selections
+        if comp not in self.components:
+            raise ValueError(f"Component {comp!r} not found in {self!r}")
+        #remove chosen component from SuperToken's components list
+        self.components.remove(comp)
+        # set comp as root by removing parents
+        comp.parent = None
+        # return (self, comp)
+        return self, comp
 
 type_set: set[str] = set[str]()
 
