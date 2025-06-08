@@ -84,7 +84,7 @@ class SuperToken(Token):
 
 type_set: set[str] = set[str]()
 
-class TypeTree:
+class TypeForest:
     """
     Manages the static qualification forest Q.
     Functions:

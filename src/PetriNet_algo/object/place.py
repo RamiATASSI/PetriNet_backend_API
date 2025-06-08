@@ -4,12 +4,12 @@ from collections import deque # easier add/remove from both ends of a deque for 
 
 
 class Place:
-    def _init_(self, place_name, type_tree):
+    def _init_(self, place_name, type_forest):
         self.place_name: str = place_name
-        self.type_tree = type_tree
+        self.type_forest = type_forest
         # lists of mappings of root level tokens: token type -> root level token list
         self.tokens: dict[str, list[Token]] = {}
-        # counts for each possible token type (roots and subtypes) to stop full lookups to Q (type_tree) each time
+        # counts for each possible token type (roots and subtypes) to stop full lookups to Q (type_forest) each time
         self.counts: dict[str, int] = {}
         # to remove a token once a transition is sensitized, we need to know which specific one is going to get removed instead of removing it from the count like we do
         # originally, we remove the amount required from the deque's head: O(1)
@@ -17,18 +17,18 @@ class Place:
         self.index: dict[str, deque[Token]] = {}
     
     '''
-      Ensure the given type exists in the type tree. Raise TypeError if type not found
+      Ensure the given type exists in the type forest. Raise TypeError if type not found
     '''
     def check_valid_type(self, type_name):
         # get_descendants returns an empty list for unknown types
-        if not self.type_tree.get_descendants(type_name):
+        if not self.type_forest.get_descendants(type_name):
             raise TypeError(f"Unknown token type or qualifier: '{type_name}'")
 
     '''
     Helper: Increments counts and appends to a deque for every type under which this token qualifies.
     '''
     def register_token(self, token: Token):
-        types = self.type_tree.get_descendants(token.type_name)
+        types = self.type_forest.get_descendants(token.type_name)
         for t in types:
             # increment count for the type t:
             self.counts[t] = self.counts.get(t, 0) + 1
@@ -43,7 +43,7 @@ class Place:
     Helper: Decrements counts and removes one occurrence from each type deque in index.
     '''
     def deregister_token(self, token:Token):
-        types = self.type_tree.get_descendants(token.type_name)
+        types = self.type_forest.get_descendants(token.type_name)
         for t in types:
             if self.counts[t] <= 0:
                 raise ValueError(f"Token count for type '{t}' is zero for this place, cannot remove token")
