@@ -133,7 +133,7 @@ class Merger(Operator):
         )
 
 
-class Spliter(Operator):
+class Splitter(Operator):
     def __init__(self, operator_id: OperatorId, normal_output_dest: OperatorId, selector: Transformation):
         super().__init__(operator_id, normal_output_dest, transformation=selector)
 
@@ -193,7 +193,7 @@ def get_batches(operators: list[Operator], inputs: list[OperatorId]) -> list[lis
     for op in batches[0]:
         if type(op) in [Move, Transformer, Merger]:
             leaf_connections.add((op.normal_output_dest, NORMAL_CHANNEL_ID))
-        elif type(op) is Spliter:
+        elif type(op) is Splitter:
             leaf_connections.add((op.normal_output_dest, NORMAL_CHANNEL_ID))
             leaf_connections.add((op.special_output_dest, SPECIAL_CHANNEL_ID))
         elif type(op) in [Consumer, Generator]:
@@ -255,7 +255,7 @@ def get_batches(operators: list[Operator], inputs: list[OperatorId]) -> list[lis
                 else:
                     next_potential_nodes.add(potential_node)
                 pass
-            elif type(potential_node) is Spliter:
+            elif type(potential_node) is Splitter:
                 if leaf_connections.__contains__((potential_node.operator_id, NORMAL_CHANNEL_ID)):
                     batches[-1].append(potential_node)
 
