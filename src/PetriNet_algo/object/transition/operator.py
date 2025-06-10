@@ -7,21 +7,24 @@ from src.PetriNet_algo.object.token import Token
 """A transformation/generator/selector function."""
 type Transformation = Callable[[Token | None], Token]
 
-"""The type for operator identification."""
-type OperatorId = int
-"""Void operator output."""
-NO_OUTPUT_ID = -1
-"""A Token and its destination."""
-type Packet = (OperatorId, Token)
-"""An empty packet."""
-EMPTY_PACKET = (NO_OUTPUT_ID, None)
-
 """The type for channel identification."""
 type ChannelId = int
+"""The ID of a void channel."""
+VOID_CHANNEL_ID = -1
 """The ID of the normal channel."""
 NORMAL_CHANNEL_ID = 0
 """The ID of the special channel."""
 SPECIAL_CHANNEL_ID = 1
+
+"""The type for operator identification."""
+type OperatorId = int
+"""Void operator output."""
+VOID_OUTPUT_ID = -1
+
+"""A Token and its destination."""
+type Packet = tuple[OperatorId, ChannelId, Token]
+"""An empty packet."""
+EMPTY_PACKET = (VOID_OUTPUT_ID, VOID_CHANNEL_ID, None)
 
 ########################################################################################################################
 ####################################################### Operator #######################################################
@@ -45,24 +48,39 @@ class Operator:
     def __init__(self,
                  operator_id: OperatorId,
                  normal_output_dest: OperatorId,
-                 special_output_dest: OperatorId = NO_OUTPUT_ID,
+                 special_output_dest: OperatorId = VOID_OUTPUT_ID,
                  transformation: Transformation = lambda token: token):
-        self.transformation = transformation
         self.operator_id = operator_id
+        self.transformation = transformation
+
         self.normal_output_dest = normal_output_dest
+        self.normal_input_channel: None | Token = None
         self.special_output_dest = special_output_dest
+        self.special_input_channel: None | Token = None
+
+    def ingest_packet(self, packet: Packet):
+        assert(packet[0] == self.operator_id)
+        if packet[1] == NORMAL_CHANNEL_ID:
+            if self.normal_input_channel is None:
+                self.normal_input_channel = packet[2]
+            else:
+                raise RuntimeError("Normal channel of operator {} is already occupied".format(self.operator_id))
+        elif packet[1] == SPECIAL_CHANNEL_ID:
+            if self.special_input_channel is None:
+                self.special_input_channel = packet[2]
+            else:
+                raise RuntimeError("Special channel of operator {} is already occupied".format(self.operator_id))
+        else:
+            raise RuntimeError("Channel ID of packet {} is not valid".format(packet))
+
+    def __clear__(self):
+        self.normal_input_channel = None
+        self.special_output_dest = None
 
     @abstractmethod
-    def compute(self, normal_channel_input: Token, special_channel_input: Token) -> (Packet, Packet):
+    def __compute__(self) -> list[Packet]:
         """
         TODO
-
-        Parameters
-        ----------
-        normal_channel_input: Token
-            The Token to use in the normal channel.
-        special_channel_input: Token
-            A SuperToken to use for merge and unmerge operations.
 
         Return
         ------
@@ -70,81 +88,100 @@ class Operator:
         """
         pass
 
+    @abstractmethod
+    def __is_computable__(self) -> bool:
+        """TODO"""
+        pass
+
+    def compute(self) -> list[Packet]:
+        """
+        TODO
+        """
+        if self.__is_computable__():
+            produced_tokens = self.__compute__()
+            self.__clear__()
+            return produced_tokens
+        else:
+            raise RuntimeError("Operator {} is not computable".format(self.operator_id))
+
 
 class Move(Operator):
     def __init__(self, operator_id: OperatorId, normal_output_dest: OperatorId):
         super().__init__(operator_id, normal_output_dest)
 
-    def compute(self, normal_channel_input: Token, special_channel_input: Token) -> (Packet, Packet):
-        assert(special_channel_input is None)
-        return (
-            (self.normal_output_dest, normal_channel_input),
-            EMPTY_PACKET
-        )
+    def __compute__(self) -> list[Packet]:
+        assert(self.special_input_channel is None)
+        return [(self.normal_output_dest, NORMAL_CHANNEL_ID, self.normal_input_channel)]
+
+    def __is_computable__(self) -> bool:
+        return self.normal_input_channel is not None and self.special_input_channel is None
 
 
 class Consumer(Operator):
     def __init__(self, operator_id: OperatorId, normal_output_dest: OperatorId):
         super().__init__(operator_id, normal_output_dest)
 
-    def compute(self, normal_channel_input: Token, special_channel_input: Token) -> (Packet, Packet):
-        assert(special_channel_input is None)
-        return (
-            EMPTY_PACKET,
-            EMPTY_PACKET
-        )
+    def __compute__(self) -> list[Packet]:
+        assert(self.special_input_channel is None)
+        return list()
+
+    def __is_computable__(self) -> bool:
+        return self.normal_input_channel is not None and self.special_input_channel is None
 
 
 class Generator(Operator):
     def __init__(self, operator_id: OperatorId, normal_output_dest: OperatorId, generator: Transformation):
         super().__init__(operator_id, normal_output_dest, transformation=generator)
 
-    def compute(self, normal_channel_input: Token, special_channel_input: Token) -> Packet:
-        assert(normal_channel_input is None)
-        assert(special_channel_input is None)
-        return (
-            (normal_channel_input, self.transformation(None)),
-            EMPTY_PACKET
-        )
+    def __compute__(self) -> list[Packet]:
+        assert(self.normal_input_channel is None)
+        assert(self.special_input_channel is None)
+        return [(self.normal_output_dest, NORMAL_CHANNEL_ID, self.transformation(None))]
+
+    def __is_computable__(self) -> bool:
+        return self.normal_input_channel is None and self.special_input_channel is None
 
 
 class Transformer(Operator):
     def __init__(self, operator_id: OperatorId, normal_output_dest: OperatorId, transformation: Transformation):
         super().__init__(operator_id, normal_output_dest, transformation=transformation)
 
-    def compute(self, normal_channel_input: Token, special_channel_input: Token) -> (Packet, Packet):
-        assert(special_channel_input is None)
-        return (
-            (self.normal_output_dest, self.transformation(normal_channel_input)),
-            EMPTY_PACKET
-        )
+    def __compute__(self) -> list[Packet]:
+        assert(self.special_input_channel is None)
+        return [(self.normal_output_dest, NORMAL_CHANNEL_ID, self.transformation(self.normal_input_channel))]
+
+    def __is_computable__(self) -> bool:
+        return self.normal_input_channel is not None and self.special_input_channel is None
 
 
 class Merger(Operator):
     def __init__(self, operator_id: OperatorId, normal_output_dest: OperatorId):
         super().__init__(operator_id, normal_output_dest)
 
-    def compute(self, normal_channel_input: Token, special_channel_input: Token) -> (Packet, Packet):
+    def __compute__(self) -> list[Packet]:
         # TODO Write Merge in Token
-        assert(special_channel_input.is_super_token())
-        return (
-            (self.normal_output_dest, special_channel_input.merge(normal_channel_input)),
-            EMPTY_PACKET
-        )
+        assert(self.special_input_channel.is_super_token())
+        return [(self.normal_output_dest, NORMAL_CHANNEL_ID, self.special_input_channel.merge(self.normal_input_channel))]
+
+    def __is_computable__(self) -> bool:
+        return self.normal_input_channel is not None and self.special_input_channel is not None
 
 
 class Splitter(Operator):
     def __init__(self, operator_id: OperatorId, normal_output_dest: OperatorId, selector: Transformation):
         super().__init__(operator_id, normal_output_dest, transformation=selector)
 
-    def compute(self, normal_channel_input: Token, special_channel_input: Token) -> (Packet, Packet):
-        assert(normal_channel_input.is_super_token())
+    def __compute__(self) -> list[Packet]:
+        assert(self.normal_input_channel.is_super_token())
         # TODO Write Split in Token
-        (super_token, particle) = normal_channel_input.split(self.transformation)
-        return (
-            (self.normal_output_dest, particle),
-            (self.special_output_dest, super_token)
-        )
+        (super_token, particle) = self.normal_input_channel.split(self.transformation)
+        return [
+            (self.normal_output_dest, NORMAL_CHANNEL_ID, particle),
+            (self.special_output_dest, SPECIAL_CHANNEL_ID, super_token)
+        ]
+
+    def __is_computable__(self) -> bool:
+        return self.normal_input_channel is not None and self.special_input_channel is None
 
 ########################################################################################################################
 #################################################### Operator Graph ####################################################
@@ -278,30 +315,66 @@ def get_batches(operators: list[Operator], inputs: list[OperatorId]) -> list[lis
 
     return batches
 
-type PlaceId = Place
+type PlaceId = Place # TODO should be in place.py
 class OperatorGraph:
     """
     TODO
     """
     def __init__(self, operators: list[Operator], inputs: list[OperatorId], outputs: dict[OperatorId, PlaceId]):
-        self.batches = get_batches(operators, inputs)
-        self.inputs = inputs
+        self.batches: list[list[Operator]] = get_batches(operators, inputs)
+        #self.inputs = inputs
         self.outputs = outputs
-        # TODO ?
 
-    def run(self, inputs: dict[OperatorId, Token]):
+    def run(self, inputs: dict[OperatorId, Token]) -> dict[PlaceId, list[Token]]:
         """
         With given inputs, run them through the operators graph.
 
         Parameters
         ----------
         inputs: dict[OperatorId, Token]
-            The input tokens.
+            A map of OperatorId to a particular Token.
 
         Returns
         -------
-        dict[Place, Token]
+        dict[Place, list[Token]]
             A map of token to put into places (the map is reversed key-value wise for convenience).
         """
-        # Idea have a dynamic map of packet to dipatch in the next batch
-        pass
+        def get_operator_index_for_packet(packet_: Packet) -> (int, int):
+            """
+            Find the position in batches of the destination of a packet.
+            :param packet_: The packet whose destination we are looking for.
+            :return: The batch number and the index in said batch.
+            """
+            for b_ in range(len(self.batches)):
+                for i_ in range(len(self.batches[b_])):
+                    if self.batches[b_][i_].operator_id == packet_[0]:
+                        return b_, i_
+            raise RuntimeError("No operator found for packet {}".format(packet_))
+
+        # Interface from inputs (feeding inputs to first batch)
+        for input_op_id in list(inputs.keys()):
+            input_packet = (input_op_id, NORMAL_CHANNEL_ID, inputs.get(input_op_id))
+            (b, i) = get_operator_index_for_packet(input_packet)
+            self.batches[b][i].ingest_packet(input_packet)
+
+        # Running all batches but the last
+        for batch in self.batches[:-1]:
+            for op in batch:
+                new_packets = op.compute()
+                for new_packet in new_packets:
+                    (b, i) = get_operator_index_for_packet(new_packet)
+                    # assert(b > current batch)
+                    self.batches[b][i].ingest_packet(new_packet)
+
+        # Interface to outputs (last batch has void destinations)
+        output_dict: dict[PlaceId, list[Token]] = dict()
+        for op in self.batches[-1]:
+            output_tokens = op.compute()
+            for output_token in output_tokens:
+                dest = self.outputs[op.operator_id]
+                if output_dict.__contains__(dest):
+                    output_dict[dest].append(output_token[2])
+                else:
+                    output_dict[dest] = [output_token[2]]
+
+        return output_dict
