@@ -1,6 +1,7 @@
 from abc import abstractmethod
+from typing import Callable
 
-type Attribute = dict[str, type]
+type Attribute = list[tuple[str, type]]
 
 class Token:
     """
@@ -17,13 +18,16 @@ class Token:
     def __init__(self, token_type: 'TokenType', attributes: Attribute):
         self.token_type = token_type
         self.attributes = attributes
+
     @abstractmethod
     def is_super_token(self) -> bool:
+        """A small function to determine if a function is a SuperToken (avoid casting and instance checking)"""
         pass
+
     def merge(self, other: 'Token') -> 'SuperToken':
         """Default merge: only SuperToken supports merging."""
         raise TypeError(f"Cannot merge into non-super token {self!r} !")
-    def split(self, selector: callable[['SuperToken'], 'Token']) -> ('SuperToken', Token):
+    def split(self, selector: Callable[['SuperToken'], 'Token']) -> ('SuperToken', "Token"):
         """Default split: only SuperToken supports splitting."""
         raise TypeError(f"Cannot split non-super token {self!r} !")
 
@@ -40,6 +44,7 @@ class SimpleToken(Token):
     """
     def __init__(self, token_type: 'TokenType', attributes: dict[str, type]):
         super().__init__(token_type, attributes)
+
     def is_super_token(self) -> bool:
         return False
 
@@ -77,7 +82,7 @@ class SuperToken(Token):
        # return supertoken
        return self
     
-    def split(self, selector: callable[['SuperToken'], Token]) -> ('SuperToken', Token):
+    def split(self, selector: Callable[['SuperToken'], Token]) -> ('SuperToken', Token):
         """
         Split off one component from this super-token.
         Returns a tuple of (modified_super_token, extracted_token).  Raises a ValueError if the selector returns a token not present in components.
