@@ -1,6 +1,7 @@
 from abc import abstractmethod
-from typing import Callable
+from typing import Callable, TypeVar, Generic
 
+from src.PetriNet_algo.data_structures.dict_list_builder import DictListBuilder
 from src.PetriNet_algo.object.place import Place
 from src.PetriNet_algo.object.token import Token
 
@@ -59,7 +60,7 @@ class Operator:
         self.special_input_channel: None | Token = None
 
     def ingest_packet(self, packet: Packet):
-        assert(packet[0] == self.operator_id)
+        assert packet[0] == self.operator_id
         if packet[1] == NORMAL_CHANNEL_ID:
             if self.normal_input_channel is None:
                 self.normal_input_channel = packet[2]
@@ -110,7 +111,7 @@ class Move(Operator):
         super().__init__(operator_id, normal_output_dest)
 
     def __compute__(self) -> list[Packet]:
-        assert(self.special_input_channel is None)
+        assert self.special_input_channel is None
         return [(self.normal_output_dest, NORMAL_CHANNEL_ID, self.normal_input_channel)]
 
     def __is_computable__(self) -> bool:
@@ -122,7 +123,7 @@ class Consumer(Operator):
         super().__init__(operator_id, normal_output_dest)
 
     def __compute__(self) -> list[Packet]:
-        assert(self.special_input_channel is None)
+        assert self.special_input_channel is None
         return list()
 
     def __is_computable__(self) -> bool:
@@ -134,8 +135,8 @@ class Generator(Operator):
         super().__init__(operator_id, normal_output_dest, transformation=generator)
 
     def __compute__(self) -> list[Packet]:
-        assert(self.normal_input_channel is None)
-        assert(self.special_input_channel is None)
+        assert self.normal_input_channel is None
+        assert self.special_input_channel is None
         return [(self.normal_output_dest, NORMAL_CHANNEL_ID, self.transformation(None))]
 
     def __is_computable__(self) -> bool:
@@ -147,7 +148,7 @@ class Transformer(Operator):
         super().__init__(operator_id, normal_output_dest, transformation=transformation)
 
     def __compute__(self) -> list[Packet]:
-        assert(self.special_input_channel is None)
+        assert self.special_input_channel is None
         return [(self.normal_output_dest, NORMAL_CHANNEL_ID, self.transformation(self.normal_input_channel))]
 
     def __is_computable__(self) -> bool:
@@ -160,7 +161,7 @@ class Merger(Operator):
 
     def __compute__(self) -> list[Packet]:
         # TODO Write Merge in Token
-        assert(self.special_input_channel.is_super_token())
+        assert self.special_input_channel.is_super_token()
         return [(self.normal_output_dest, NORMAL_CHANNEL_ID, self.special_input_channel.merge(self.normal_input_channel))]
 
     def __is_computable__(self) -> bool:
@@ -172,7 +173,7 @@ class Splitter(Operator):
         super().__init__(operator_id, normal_output_dest, transformation=selector)
 
     def __compute__(self) -> list[Packet]:
-        assert(self.normal_input_channel.is_super_token())
+        assert self.normal_input_channel.is_super_token()
         # TODO Write Split in Token
         (super_token, particle) = self.normal_input_channel.split(self.transformation)
         return [
@@ -363,18 +364,17 @@ class OperatorGraph:
                 new_packets = op.compute()
                 for new_packet in new_packets:
                     (b, i) = get_operator_index_for_packet(new_packet)
-                    # assert(b > current batch)
+                    # assert b > current batch
                     self.batches[b][i].ingest_packet(new_packet)
 
         # Interface to outputs (last batch has void destinations)
-        output_dict: dict[PlaceId, list[Token]] = dict()
+        dict_list_builder = DictListBuilder[PlaceId, Token]()
         for op in self.batches[-1]:
             output_tokens = op.compute()
-            for output_token in output_tokens:
-                dest = self.outputs[op.operator_id]
-                if output_dict.__contains__(dest):
-                    output_dict[dest].append(output_token[2])
-                else:
-                    output_dict[dest] = [output_token[2]]
 
-        return output_dict
+            for output_token in output_tokens:
+                dest: PlaceId = self.outputs[op.operator_id]
+                token: Token = output_token[2]
+                dict_list_builder.append(dest, token)
+
+        return dict_list_builder.build()
