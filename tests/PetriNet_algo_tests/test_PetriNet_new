@@ -1,0 +1,219 @@
+import unittest
+
+from src.PetriNet_algo.object.token import (
+    TokenType,
+    TypeForest,
+    SimpleToken,
+    SuperToken,
+    type_set
+)
+
+from src.PetriNet_algo.object.place import Place
+
+class TokenTypeTests(unittest.TestCase):
+    def setUp(self):
+        type_set.clear()
+
+    def test_type_name_uniqueness_and_creation(self):
+        tt = TokenType("A")
+        self.assertEqual(tt.type_name, "A")
+        with self.assertRaises(ValueError):
+            TokenType("A") 
+
+    def test_add_and_remove_subtype(self):
+        parent = TokenType("P")
+        child = TokenType("C", parent=parent)
+        self.assertIn(child, parent.children)
+        self.assertIs(child.parent, parent)
+
+        parent.remove_subtype("C")
+        self.assertNotIn(child, parent.children)
+        self.assertIsNone(child.parent)
+
+        with self.assertRaises(ValueError):
+            parent.remove_subtype("nonexistent")
+
+    def test_change_parent(self):
+        root1 = TokenType("R1")
+        root2 = TokenType("R2")
+        c = TokenType("C", parent=root1)
+        # move C under root2
+        c.change_parent(root2)
+        self.assertIn(c, root2.children)
+        self.assertNotIn(c, root1.children)
+        self.assertIs(c.parent, root2)
+
+class TypeForestTests(unittest.TestCase):
+    def setUp(self):
+        type_set.clear()
+        self.f = TypeForest()
+
+    def test_add_and_subtype(self):
+        self.f.add_type("X")
+        self.f.add_type("Y", parent_name="X")
+        self.assertTrue(self.f.is_subtype("Y", "X"))
+        self.assertFalse(self.f.is_subtype("X", "Y"))
+        self.assertListEqual(self.f.get_descendants("X"), ["X", "Y"])
+        self.assertListEqual(self.f.get_descendants("Y"), ["Y"])
+
+    def test_remove_type_and_errors(self):
+        self.f.add_type("A")
+        self.f.add_type("B", parent_name="A")
+        self.f.remove_type("A")
+        self.assertListEqual(self.f.get_descendants("A"), [])
+        with self.assertRaises(ValueError):
+            self.f.remove_type("nonexistent")
+
+    def test_change_parent_errors(self):
+        self.f.add_type("A")
+        self.f.add_type("B")
+        self.f.add_type("C", parent_name="A")
+        self.f.change_parent("C", "B")
+        self.assertTrue(self.f.is_subtype("C", "B"))
+        with self.assertRaises(ValueError):
+            self.f.change_parent("C", "missing")
+        with self.assertRaises(ValueError):
+            self.f.change_parent("missing", "A")
+
+class SimpleTokenTests(unittest.TestCase):
+    def setUp(self):
+        type_set.clear()
+
+    def test_simple_token_basics_and_errors(self):
+        tt = TokenType("Leaf")
+        attrs = [("x", int), ("y", str)]
+        st = SimpleToken(tt, attrs)
+        self.assertFalse(st.is_super_token())
+        self.assertIs(st.token_type, tt)
+        self.assertEqual(st.attributes, attrs)
+        with self.assertRaises(TypeError):
+            st.merge(st)
+        with self.assertRaises(TypeError):
+            st.split(lambda s: s)
+
+class SuperTokenTests(unittest.TestCase):
+    def setUp(self):
+        type_set.clear()
+        tt = TokenType("T")
+        self.child1 = SimpleToken(tt, [("v", int)])
+        self.child2 = SimpleToken(tt, [("w", int)])
+        self.sup = SuperToken(tt, [], components=[self.child1, self.child2])
+
+    def test_is_super_token(self):
+        self.assertTrue(self.sup.is_super_token())
+
+    def test_merge_appends_and_sets_parent(self):
+        newtok = SimpleToken(self.sup.token_type, [])
+        ret = self.sup.merge(newtok)
+        self.assertIs(ret, self.sup)
+        self.assertIn(newtok, self.sup.components)
+        self.assertIs(newtok.parent, self.sup)
+
+    def test_split_extracts_and_unparents(self):
+        sup_after, extracted = self.sup.split(lambda s: s.components[0])
+        self.assertIs(sup_after, self.sup)
+        self.assertIs(extracted, self.child1)
+        self.assertIsNone(extracted.parent)
+        self.assertNotIn(self.child1, self.sup.components)
+
+    def test_split_invalid_selector(self):
+        t = SimpleToken(self.sup.token_type, [])
+        with self.assertRaises(ValueError):
+            self.sup.split(lambda s: t)
+
+class PlaceTests(unittest.TestCase):
+    def setUp(self):
+        # Reset type registry
+        try:
+            from src.PetriNet_algo.object.token import type_set
+            type_set.clear()
+        except Exception:
+            pass
+
+        # type hierarchy: Living -> Animal -> Mammal -> {Cat, Dog}
+        self.tf = TypeForest()
+        self.tf.add_type("Living")
+        self.tf.add_type("Animal", parent_name="Living")
+        self.tf.add_type("Mammal", parent_name="Animal")
+        self.tf.add_type("Cat", parent_name="Mammal")
+        self.tf.add_type("Dog", parent_name="Mammal")
+
+        self.place = Place("Pets", self.tf)
+        self.cats = [SimpleToken(self.tf._nodes["Cat"], {}) for _ in range(2)]
+        self.dogs = [SimpleToken(self.tf._nodes["Dog"], {}) for _ in range(3)]
+
+    def test_add_and_count(self):
+        # Add mixed tokens
+        for t in self.cats + self.dogs:
+            self.place.add_token(t)
+        self.assertEqual(self.place.get_total_token_count("Cat"), 2)
+        self.assertEqual(self.place.get_total_token_count("Dog"), 3)
+        # Check supertype counts
+        self.assertEqual(self.place.get_total_token_count("Mammal"), 5)
+        self.assertEqual(self.place.get_total_token_count("Animal"), 5)
+        self.assertEqual(self.place.get_total_token_count("Living"), 5)
+
+    def test_fifo_hierarchy_removal(self):
+        # interleave Cat, Dog, Cat, Dog, Dog
+        seq = [self.cats[0], self.dogs[0], self.cats[1], self.dogs[1], self.dogs[2]]
+        for tok in seq:
+            self.place.add_token(tok)
+        removed = self.place.remove_tokens("Mammal", 3)
+        self.assertEqual(removed, seq[:3])
+        self.assertEqual(self.place.get_total_token_count("Mammal"), 2)
+
+    def test_remove_specific_and_errors(self):
+        for c in self.cats:
+            self.place.add_token(c)
+        with self.assertRaises(ValueError):
+            self.place.remove_tokens("Dog", 1)
+        rem = self.place.remove_tokens("Cat", 1)
+        self.assertEqual(len(rem), 1)
+        self.assertEqual(self.place.get_total_token_count("Cat"), 1)
+
+    def test_remove_zero(self):
+        # Removing zero tokens returns empty list
+        self.assertEqual(self.place.remove_tokens("Cat", 0), [])
+
+    def test_insufficient_error(self):
+        # Place empty, removing any raises
+        with self.assertRaises(ValueError):
+            self.place.remove_tokens("Living", 1)
+
+    def test_robust_hierarchy_and_fifo(self):
+        # Another hierarchy: Mammal -> Feline -> {Cat,Tiger}, Mammal -> Canine -> {Dog,Wolf}
+        tf2 = TypeForest()
+        tf2.add_type("Mammal")
+        tf2.add_type("Feline", parent_name="Mammal")
+        tf2.add_type("Cat", parent_name="Feline")
+        tf2.add_type("Tiger", parent_name="Feline")
+        tf2.add_type("Canine", parent_name="Mammal")
+        tf2.add_type("Dog", parent_name="Canine")
+        tf2.add_type("Wolf", parent_name="Canine")
+        place2 = Place("P2", tf2)
+        cats = [SimpleToken(tf2._nodes["Cat"], {}) for _ in range(2)]
+        tigers = [SimpleToken(tf2._nodes["Tiger"], {}) for _ in range(1)]
+        dogs = [SimpleToken(tf2._nodes["Dog"], {}) for _ in range(3)]
+        wolves = [SimpleToken(tf2._nodes["Wolf"], {}) for _ in range(2)]
+        seq = [cats[0], dogs[0], tigers[0], wolves[0], cats[1], dogs[1], wolves[1], dogs[2]]
+        for tok in seq:
+            place2.add_token(tok)
+        # counts
+        self.assertEqual(place2.get_total_tokens("Cat"), 2)
+        self.assertEqual(place2.get_total_tokens("Tiger"), 1)
+        self.assertEqual(place2.get_total_tokens("Feline"), 3)
+        self.assertEqual(place2.get_total_tokens("Dog"), 3)
+        self.assertEqual(place2.get_total_tokens("Wolf"), 2)
+        self.assertEqual(place2.get_total_tokens("Canine"), 5)
+        self.assertEqual(place2.get_total_tokens("Mammal"), 8)
+        # remove all Felines (3)
+        removed_feline = place2.remove_tokens("Feline", 3)
+        self.assertEqual(removed_feline, [cats[0], tigers[0], cats[1]])
+        self.assertEqual(place2.get_total_tokens("Feline"), 0)
+        # remove two Mammals (Dogs/Wolves FIFO)
+        removed_mammal = place2.remove_tokens("Mammal", 2)
+        self.assertEqual(removed_mammal, [dogs[0], wolves[0]])
+        self.assertEqual(place2.get_total_tokens("Mammal"), 3)
+
+if __name__ == "__main__":
+    unittest.main()
