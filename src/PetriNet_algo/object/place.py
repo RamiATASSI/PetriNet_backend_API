@@ -2,6 +2,9 @@ from src.PetriNet_algo.object.token import Token
 from collections import deque # easier add/remove from both ends of a deque for tokens in a place
 
 
+type PlaceId = Place
+
+
 class Place:
     def _init_(self, place_name, type_forest):
         self.place_name: str = place_name

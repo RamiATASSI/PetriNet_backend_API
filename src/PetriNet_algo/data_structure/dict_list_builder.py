@@ -16,12 +16,10 @@ class DictListBuilder(Generic[K, V]):
         :param value:
         :return:
         """
-        if key not in self._dict:
-            new_list = self._dict.get(key)
-            new_list += value
-            self._dict[key] = new_list
+        if key in self._dict:
+            self._dict[key].append(value)
         else:
-            self._dict[key] = value
+            self._dict[key] = [value]
 
     def append_all(self, key: K, values: list[V]) -> None:
         """
@@ -30,12 +28,16 @@ class DictListBuilder(Generic[K, V]):
         :param values:
         :return: Something
         """
-        if key not in self._dict:
-            new_list = self._dict.get(key)
-            new_list += values
-            self._dict[key] = new_list
+        if key in self._dict:
+            self._dict[key].extend(values)
         else:
             self._dict[key] = values
+
+    def get(self, key: K) -> list[V]:
+        return self._dict[key]
+
+    def contains(self, key: K) -> bool:
+        return key in self._dict
 
     def build(self):
         return self._dict.copy()

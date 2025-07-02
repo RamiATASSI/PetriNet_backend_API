@@ -1,9 +1,9 @@
-from abc import abstractmethod
-from typing import Callable, TypeVar, Generic
+from abc import abstractmethod, ABC
+from typing import Callable
 
-from src.PetriNet_algo.data_structures.dict_list_builder import DictListBuilder
-from src.PetriNet_algo.object.place import Place
-from src.PetriNet_algo.object.token import Token
+from src.PetriNet_algo.data_structure.dict_list_builder import DictListBuilder
+from src.PetriNet_algo.object.place import Place, PlaceId
+from src.PetriNet_algo.object.token import Token, Attribute, AttributeK
 
 """A transformation/generator/selector function."""
 type Transformation = Callable[[Token | None], Token]
@@ -31,7 +31,8 @@ EMPTY_PACKET = (VOID_OUTPUT_ID, VOID_CHANNEL_ID, None)
 ####################################################### Operator #######################################################
 ########################################################################################################################
 
-class Operator:
+
+class Operator(ABC):
     """
     A node inside the OperatorMatrix.
 
@@ -103,7 +104,8 @@ class Operator:
             self.__clear__()
             return produced_tokens
         else:
-            raise RuntimeError("Operator {} is not computable".format(self.operator_id))
+            # DEBUG: "Operator {} is not computable".format(self.operator_id)
+            return []
 
 
 class Move(Operator):
@@ -118,16 +120,51 @@ class Move(Operator):
         return self.normal_input_channel is not None and self.special_input_channel is None
 
 
-class Consumer(Operator):
-    def __init__(self, operator_id: OperatorId, normal_output_dest: OperatorId):
-        super().__init__(operator_id, normal_output_dest)
+class Transformer(Operator):
+    def __init__(self, operator_id: OperatorId, normal_output_dest: OperatorId, transformation: Transformation):
+        super().__init__(operator_id, normal_output_dest, transformation=transformation)
 
     def __compute__(self) -> list[Packet]:
         assert self.special_input_channel is None
-        return list()
+        return [(self.normal_output_dest, NORMAL_CHANNEL_ID, self.transformation(self.normal_input_channel))]
 
     def __is_computable__(self) -> bool:
         return self.normal_input_channel is not None and self.special_input_channel is None
+
+
+class Duplicate(Operator):
+    def __init__(self, operator_id: OperatorId, special_output_dest: OperatorId):
+        super().__init__(operator_id, special_output_dest)
+
+    def __compute__(self) -> list[Packet]:
+        return [
+            (self.normal_output_dest,  NORMAL_CHANNEL_ID,  self.normal_input_channel),
+            (self.special_output_dest, SPECIAL_CHANNEL_ID, self.normal_input_channel.copy()),
+        ]
+
+    def __is_computable__(self) -> bool:
+        return self.normal_input_channel is not None and self.special_input_channel is None
+
+
+class Import(Operator):
+    """TODO"""
+    def __init__(self, operator_id: OperatorId, special_output_dest: OperatorId, attribute_key_in: AttributeK, attribute_key_out: AttributeK):
+        super().__init__(operator_id, special_output_dest)
+        self.attribute_key_in = attribute_key_in
+        self.attribute_key_out = attribute_key_out
+
+    def __compute__(self) -> list[Packet]:
+        token = self.normal_input_channel
+        token_to_import_from = self.special_input_channel
+        attribute_val = token_to_import_from.attributes[self.attribute_key]
+        token.attributes[self.attribute_key] = attribute_val
+
+        return [
+            (self.normal_output_dest, NORMAL_CHANNEL_ID, token),
+        ]
+
+    def __is_computable__(self) -> bool:
+        return self.normal_input_channel is not None and self.special_input_channel is not None
 
 
 class Generator(Operator):
@@ -143,26 +180,29 @@ class Generator(Operator):
         return self.normal_input_channel is None and self.special_input_channel is None
 
 
-class Transformer(Operator):
-    def __init__(self, operator_id: OperatorId, normal_output_dest: OperatorId, transformation: Transformation):
-        super().__init__(operator_id, normal_output_dest, transformation=transformation)
+class Consumer(Operator):
+    def __init__(self, operator_id: OperatorId, normal_output_dest: OperatorId):
+        super().__init__(operator_id, normal_output_dest)
 
     def __compute__(self) -> list[Packet]:
         assert self.special_input_channel is None
-        return [(self.normal_output_dest, NORMAL_CHANNEL_ID, self.transformation(self.normal_input_channel))]
+        return list()
 
     def __is_computable__(self) -> bool:
         return self.normal_input_channel is not None and self.special_input_channel is None
 
 
 class Merger(Operator):
-    def __init__(self, operator_id: OperatorId, normal_output_dest: OperatorId):
+    def __init__(self, operator_id: OperatorId, normal_output_dest: OperatorId, ordering: Callable[[list[Token]], None]):
         super().__init__(operator_id, normal_output_dest)
+        self.ordering: Callable[[list[Token]], None] = ordering
 
     def __compute__(self) -> list[Packet]:
-        # TODO Write Merge in Token
         assert self.special_input_channel.is_super_token()
-        return [(self.normal_output_dest, NORMAL_CHANNEL_ID, self.special_input_channel.merge(self.normal_input_channel))]
+        return [
+            (self.normal_output_dest, NORMAL_CHANNEL_ID,
+             self.special_input_channel.merge(self.normal_input_channel, self.ordering))
+        ]
 
     def __is_computable__(self) -> bool:
         return self.normal_input_channel is not None and self.special_input_channel is not None
@@ -183,6 +223,25 @@ class Splitter(Operator):
 
     def __is_computable__(self) -> bool:
         return self.normal_input_channel is not None and self.special_input_channel is None
+
+
+class Output(Operator):
+    def __init__(self, operator_id: OperatorId, normal_output_dest: OperatorId, dest_place: PlaceId):
+        super().__init__(operator_id, normal_output_dest)
+        self.dest_place = dest_place
+
+    def __compute__(self) -> list[Packet]:
+        raise RuntimeError("An Output Operator {} is not computable".format(self.operator_id))
+
+    def __is_computable__(self) -> bool:
+        return False
+
+    def retrieve(self) -> dict[PlaceId, Token]:
+        """
+        TODO
+        """
+        return dict([(self.dest_place, self.normal_input_channel)])
+
 
 ########################################################################################################################
 #################################################### Operator Graph ####################################################
@@ -220,15 +279,23 @@ def get_batches(operators: list[Operator], inputs: list[OperatorId]) -> list[lis
                 return operator
         raise ValueError('Operator with ID {} not found'.format(operator_id))
 
+
+
+    # TODO Last batch should be the "output" operators.
+    # TODO Update doc about above TODO.
+
     operator_number = len(operators)
-    # Put inputs and generators inside the first batch (dependence-less)
+    # Put generators in the first batch and input inside the second batch
     batches: list[list[Operator]] = [
-        [operator for operator in operators if operator.operator_id in inputs or type(operator) is Generator]
+        [operator for operator in operators if type(operator) is Generator],
+        [operator for operator in operators if operator.operator_id in inputs]
     ]
+    init_batches: list[Operator] = batches[0]
+    init_batches.extend(batches[1])
 
     # Initialization of the algorithm
     leaf_connections: set[tuple[OperatorId, ChannelId]] = set()
-    for op in batches[0]:
+    for op in init_batches:
         if type(op) in [Move, Transformer, Merger]:
             leaf_connections.add((op.normal_output_dest, NORMAL_CHANNEL_ID))
         elif type(op) is Splitter:
@@ -314,9 +381,16 @@ def get_batches(operators: list[Operator], inputs: list[OperatorId]) -> list[lis
         # END for potential_node in potential_nodes:
     # END while sum([len(batch) for batch in batches]) < operator_number:
 
+    # TODO
+    #  Assert all operators are in a batch
+    #  Assert all outputs are in the last batch
+    #  Assert No dependence in the first batch
+
+    # TODO A compacter ?
+
     return batches
 
-type PlaceId = Place # TODO should be in place.py
+
 class OperatorGraph:
     """
     TODO
@@ -377,4 +451,6 @@ class OperatorGraph:
                 token: Token = output_token[2]
                 dict_list_builder.append(dest, token)
 
+        # TODO
+        #  Assert that every operator is empty
         return dict_list_builder.build()

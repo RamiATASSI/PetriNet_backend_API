@@ -1,4 +1,4 @@
-from src.PetriNet_algo.data_structures.dict_list_builder import DictListBuilder
+from src.PetriNet_algo.data_structure.dict_list_builder import DictListBuilder
 from src.PetriNet_algo.object.place import Place
 from src.PetriNet_algo.object.token import Token
 from src.PetriNet_algo.object.transition.condition import Condition, ConditionId

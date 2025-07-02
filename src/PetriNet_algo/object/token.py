@@ -1,9 +1,12 @@
-from abc import abstractmethod
+import copy
+from abc import abstractmethod, ABC
 from typing import Callable
 
-type Attribute = list[tuple[str, type]]
+type AttributeK = str
+type AttributeV = type
+type Attribute = dict[AttributeK, AttributeV]
 
-class Token:
+class Token(ABC):
     """
     An abstract class representing the tokens inside a Petri Net. Can be either a `SimpleToken` (is purely composed of
     attributes) or `SuperToken` (can be composed of other Token).
@@ -24,12 +27,17 @@ class Token:
         """A small function to determine if a function is a SuperToken (avoid casting and instance checking)"""
         pass
 
-    def merge(self, other: 'Token') -> 'SuperToken':
+    def merge(self, other: 'Token', ordering: Callable[[list['Token']], None]) -> 'SuperToken':
         """Default merge: only SuperToken supports merging."""
         raise TypeError(f"Cannot merge into non-super token {self!r} !")
     def split(self, selector: Callable[['SuperToken'], 'Token']) -> ('SuperToken', "Token"):
         """Default split: only SuperToken supports splitting."""
         raise TypeError(f"Cannot split non-super token {self!r} !")
+
+    @abstractmethod
+    def copy(self):
+        """Create a deep copy of the (attributes of the) token. The Type copy isn't deep."""
+        pass
 
 class SimpleToken(Token):
     """
@@ -47,6 +55,11 @@ class SimpleToken(Token):
 
     def is_super_token(self) -> bool:
         return False
+    def copy(self):
+        return SimpleToken(
+            self.token_type,
+            copy.deepcopy(self.attributes)
+        )
 
 class SuperToken(Token):
     """
@@ -68,17 +81,19 @@ class SuperToken(Token):
     def is_super_token(self) -> bool:
         return True
     
-    def merge(self, other: Token) -> 'SuperToken':
+    def merge(self, other: Token, ordering: Callable[[list[Token]], None]) -> 'SuperToken':
        """
         Merge another token into this super-token. Returns the `self` SuperToken, now containing `other` as part of its components.
 
         Arguments:
             other: The token to merge in.
+            ordering: The ordering of the tokens.
         """
-       # take token in the process of merging (other) and and set its parent as the supertoken (self)
+       # take token in the process of merging (other) and set its parent as the supertoken (self)
        other.parent = self
        # append token (other) to the supertoken's (self) components list: supertoken owns the token
        self.components.append(other)
+       ordering(self.components)
        # return supertoken
        return self
     
@@ -101,6 +116,9 @@ class SuperToken(Token):
         comp.parent = None
         # return (self, comp)
         return self, comp
+
+    def copy(self):
+        return SuperToken(self.token_type, copy.deepcopy(self.attributes), copy.deepcopy(self.components))
 
 type_set: set[str] = set[str]()
 
