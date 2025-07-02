@@ -1,25 +1,22 @@
 from src.PetriNet_algo.data_structure.dict_list_builder import DictListBuilder
 from src.PetriNet_algo.object.place import Place
 from src.PetriNet_algo.object.token import Token
-from src.PetriNet_algo.object.transition.condition import Condition, ConditionId
-from src.PetriNet_algo.object.transition.operator import OperatorGraph, PlaceId, OperatorId
+from src.PetriNet_algo.object.transition.condition import ConditionSwitch
+from src.PetriNet_algo.object.transition.operator import OperatorGraph
 
 
 class Transition:
     def __init__(self,
                  transition_name,
-                 conditions: list[Condition],
-                 condition_to_operator_map: dict[ConditionId, OperatorGraph],
-                 operator_graph: OperatorGraph,
-                 operator_to_places: dict[OperatorId, PlaceId]):
+                 condition_switch: ConditionSwitch,
+                 operator_graph: OperatorGraph
+             ):
         # Info
         self.transition_name: str = transition_name
 
         # Pipeline
-        self.conditions = conditions
-        self.cond2op = condition_to_operator_map
+        self.condition_switch = condition_switch
         self.operator_graph= operator_graph
-        self.op2out_map = operator_to_places
         self.consumed_tokens = list()
 
         # Miscellaneous
@@ -33,24 +30,8 @@ class Transition:
         TODO
         :return:
         """
-        for condition in self.conditions:
-            if not condition.is_condition_satisfiable():
-                return False
-        return True
-
-        # OLD
-        #if not self.consumed_tokens:
-        #    self.is_sensitized = True
-        #    return True
-
-        #for place, token in self.token_consumption.items():
-        #    for color, weight in token.items():
-        #        if color not in place.tokens or place.tokens[color] < weight:
-        #            self.is_sensitized = False
-        #            return False
-
-        #self.is_sensitized = True
-        #return True
+        self.is_sensitized = self.condition_switch.is_condition_switch_satisfiable()
+        return self.is_sensitized
 
     def shortcut_trigger_if_sensitized(self):
         """

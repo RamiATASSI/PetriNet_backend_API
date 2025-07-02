@@ -2,15 +2,15 @@ from abc import abstractmethod, ABC
 from typing import Callable
 
 from src.PetriNet_algo.data_structure.dict_list_builder import DictListBuilder
-from src.PetriNet_algo.object.place import Place, PlaceId
-from src.PetriNet_algo.object.token import Token, Attribute, AttributeK
+from src.PetriNet_algo.object.place import PlaceId
+from src.PetriNet_algo.object.token import Token, AttributeK
 
 """A transformation/generator/selector function."""
 type Transformation = Callable[[Token | None], Token]
 
 """The type for channel identification."""
 type ChannelId = int
-"""The ID of a void channel."""
+"""The ID of a void channel. Should not be used for non-Output operators"""
 VOID_CHANNEL_ID = -1
 """The ID of the normal channel."""
 NORMAL_CHANNEL_ID = 0
@@ -279,11 +279,8 @@ def get_batches(operators: list[Operator], inputs: list[OperatorId]) -> list[lis
                 return operator
         raise ValueError('Operator with ID {} not found'.format(operator_id))
 
-
-
     # TODO Last batch should be the "output" operators.
     # TODO Update doc about above TODO.
-
     operator_number = len(operators)
     # Put generators in the first batch and input inside the second batch
     batches: list[list[Operator]] = [
@@ -411,7 +408,7 @@ class OperatorGraph:
 
         Returns
         -------
-        dict[Place, list[Token]]
+        dict[PlaceId, list[Token]]
             A map of token to put into places (the map is reversed key-value wise for convenience).
         """
         def get_operator_index_for_packet(packet_: Packet) -> (int, int):
