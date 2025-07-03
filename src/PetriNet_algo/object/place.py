@@ -1,8 +1,11 @@
+import copy
+
+from PetriNet_algo.object.transition.condition import TokenMap
 from src.PetriNet_algo.object.token import Token
 from collections import deque # easier add/remove from both ends of a deque for tokens in a place
 
 
-type PlaceId = Place
+type PlaceId = str # place_name
 
 
 class Place:
@@ -107,6 +110,21 @@ class Place:
             removed_tokens.append(token)
         return removed_tokens
 
+    def get_tokens(self) -> list[Token]:
+        """
+        Return (a copy of) all tokens in the places.
+        """
+        tokens = []
+        for token_submap in self.tokens.keys():
+            tokens.extend(self.tokens[token_submap])
+        return copy.deepcopy(tokens)
+
+    def get_token_map(self) -> TokenMap:
+        """
+        Returns a TokenMap object with only one entry for this place.
+        :return:
+        """
+        return dict([(self.place_name, self.get_tokens())])
 
     def __str__(self) -> str:
         return self.place_name
