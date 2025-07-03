@@ -6,6 +6,7 @@ type AttributeK = str
 type AttributeV = type
 type Attribute = dict[AttributeK, AttributeV]
 
+
 class Token(ABC):
     """
     An abstract class representing the tokens inside a Petri Net. Can be either a `SimpleToken` (is purely composed of
@@ -30,6 +31,7 @@ class Token(ABC):
     def merge(self, other: 'Token', ordering: Callable[[list['Token']], None]) -> 'SuperToken':
         """Default merge: only SuperToken supports merging."""
         raise TypeError(f"Cannot merge into non-super token {self!r} !")
+
     def split(self, selector: Callable[['SuperToken'], 'Token']) -> ('SuperToken', "Token"):
         """Default split: only SuperToken supports splitting."""
         raise TypeError(f"Cannot split non-super token {self!r} !")
@@ -37,7 +39,6 @@ class Token(ABC):
     @abstractmethod
     def copy(self):
         """Create a deep copy of the (attributes of the) token. The Type copy isn't deep."""
-        pass
 
 class SimpleToken(Token):
     """
@@ -55,6 +56,7 @@ class SimpleToken(Token):
 
     def is_super_token(self) -> bool:
         return False
+
     def copy(self):
         return SimpleToken(
             self.token_type,

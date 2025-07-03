@@ -1,16 +1,21 @@
-# from catalogue_design import *
+"""TODO"""
 import time
-
 import numpy as np
 
-verbose_level = 0
+from PetriNet_algo.object.place import PlaceId, Place
+
+
+type PlaceDict = dict[PlaceId, Place]
+
+VERBOSE_LEVEL = 0
 
 
 class PetriNet:
-
+    """TODO"""
     def __init__(self, colors, places, transitions):
         self.colors = colors
         self.places = places
+        self.place_dict: PlaceDict = { place.id:place for place in self.places } # TODO Use when calling Transitions functions
         self.transitions = transitions
 
         self.sensitive_transitions = []
@@ -20,7 +25,8 @@ class PetriNet:
             self.added_colors[place] = place.get_colors()
 
     def print_details(self):
-        if verbose_level == 2:
+        """TODO"""
+        if VERBOSE_LEVEL == 2:
             for places in self.places.values():
                 places.describe()
             for transitions in self.transitions.values():
@@ -28,21 +34,23 @@ class PetriNet:
 
     # activate the actions of the places that have been activated
     def activate(self):
-        if verbose_level:
+        """TODO"""
+        if VERBOSE_LEVEL:
             print("Phase 0")
             print("activating")
             self.print_details()
 
         for place, colors in self.added_colors.items():
             for color in colors:
-                if verbose_level:
+                if VERBOSE_LEVEL:
                     print("Activating place: ", place)
                     print("Color: ", color)
                 place.launch_action(color)
 
     # populates the list of sensitive transitions
     def sensitize(self):
-        if verbose_level:
+        """TODO"""
+        if VERBOSE_LEVEL:
             print("Phase 1")
             print("sensitizing")
             self.print_details()
@@ -53,48 +61,51 @@ class PetriNet:
 
     # check if some of the sensitive transitions are triggered and add them to the list if they are
     def trigger(self):
-        if verbose_level:
+        """TODO"""
+        if VERBOSE_LEVEL:
             print("Phase 2")
             print("triggering")
             self.print_details()
         self.triggered_transitions = []
         self.retrigger()
-        if verbose_level:
+        if VERBOSE_LEVEL:
             print("after triggering")
             self.print_details()
 
     def retrigger(self):
+        """TODO"""
         # randomize sensitive transitions
         np.random.shuffle(self.sensitive_transitions)
 
         for transition in self.sensitive_transitions:
             if transition.check_triggered():
-                if verbose_level:
+                if VERBOSE_LEVEL:
                     print("Transition " + str(transition) + " with condition " +
                           transition.triggering_event + " triggered")
 
                 self.triggered_transitions.append(transition)
                 self.sensitive_transitions.remove(transition)
 
-                if verbose_level > 1:
+                if VERBOSE_LEVEL > 1:
                     print("Before consumption: ")
                     self.print_details()
                 transition.consume_tokens()
-                if verbose_level > 1:
+                if VERBOSE_LEVEL > 1:
                     print("After consumption: ")
                     self.print_details()
                     print("sensitive_transitions: ", self.sensitive_transitions)
                 self.sensitive_transitions = [transition for transition in self.sensitive_transitions if
                                               transition.check_sensitization()]
 
-                if verbose_level:
+                if VERBOSE_LEVEL:
                     print("new sensitive_transitions after resesitizing: ",
                           [str(transition) for transition in self.sensitive_transitions])
                 self.retrigger()
                 break
 
     def produce(self):
-        if verbose_level:
+        """TODO"""
+        if VERBOSE_LEVEL:
             print("Phase 2")
             print("producing")
             self.print_details()
@@ -107,11 +118,12 @@ class PetriNet:
                     self.added_colors[place] = set()
                 self.added_colors[place].update(colors)
 
-        if verbose_level:
+        if VERBOSE_LEVEL:
             print("After production: ")
             self.print_details()
 
     def tic(self):
+        """TODO"""
         self.activate()
         self.sensitize()
         self.trigger()
@@ -119,6 +131,7 @@ class PetriNet:
 
 
 def main() -> None:
+    """TODO"""
     transitions_json = {
         'Transition1':
             {

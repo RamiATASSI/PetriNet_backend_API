@@ -1,4 +1,6 @@
-import copy
+"""
+TODO Module docstring
+"""
 import random
 from typing import Callable
 
@@ -11,9 +13,9 @@ type ConditionId = int
 type TokenMap = dict[PlaceId, list[Token]]
 type OptionalTokenMap = None | TokenMap
 
-########################################################################################################################
-####################################################### Condition ######################################################
-########################################################################################################################
+####################################################################################################
+############################################# Condition ############################################
+####################################################################################################
 
 class Condition:
     """
@@ -22,16 +24,20 @@ class Condition:
     TODO Update
     condition_id : ConditionId
         The ID of the condition in the transition graph.
-    condition : Callable[[PlaceId], (bool, list[Token])]
-        A function that evaluate if the condition is true. The reason for the tuple is that some condition do not need
-        tokens (or need a place to be empty). In any case, if the bool is false, the list[Token] is discarded.
-    place_dependencies : list[Place]
+    place_dependencies: list[Place]
         The place into which the condition depends.
-    fetch_order: list[Token] -> list[Token]
-        An ordering function that will select the token to fetch (for example, the ones who where there first, the
-        Humans whose age is above 18, ...
-    operator_dest : list[OperatorId]
+    operator_dest: list[OperatorId],
         A list of place into which the condition will randomly dispatch the token that satisfies it.
+    consumption_condition: Callable[[TokenMap], OptionalTokenMap],
+        A function that evaluate if the condition is true. The reason for the tuple is that some
+        condition do not need tokens (or need a place to be empty). In any case, if the bool is
+        false, the list[Token] is discarded.
+    fetch_order: list[Token] -> list[Token]
+        An ordering function that will select the token to fetch (for example, the ones who where
+        there first, the Humans whose age is above 18, ...
+    additional_condition: Callable[[TokenMap], bool] = lambda _: True
+        (Optional) Addition conditions that would be required to run the Condition, but without
+        consuming any token, for example "Place 1 must be empty", "Place 2 must be have a size of 2.
     """
     def __init__(self,
                  condition_id: ConditionId,
@@ -50,7 +56,8 @@ class Condition:
 
     def fetch_tokens_copy(self) -> TokenMap:
         """
-        Fetches all tokens from the place_dependencies (even ones that aren't needed for the condition).
+        Fetches all tokens from the place_dependencies (even ones that aren't needed for the
+        condition).
         :return:
             TODO
         """
@@ -65,18 +72,19 @@ class Condition:
         """
         if self.additional_condition(tokens):
             return self.consumption_condition(self.fetch_order(tokens))
-        else:
-            return None
+        return None
 
 
-########################################################################################################################
-#################################################### Condition List ####################################################
-########################################################################################################################
+####################################################################################################
+########################################## Condition List ##########################################
+####################################################################################################
 class ConditionList:
+    """TODO"""
     def __init__(self, conditions: list[Condition]):
         self.conditions = conditions
 
     def is_condition_list_satisfiable(self) -> OptionalTokenMap:
+        """TODO"""
         # Generating (Fetching) available tokens
         tokens = DictListBuilder()
         for condition in self.conditions:
@@ -102,15 +110,17 @@ class ConditionList:
             tokens_map.append_map(condition.fetch_tokens_copy())
         return tokens_map.build()
 
-########################################################################################################################
-################################################### Condition Switch ###################################################
-########################################################################################################################
+####################################################################################################
+######################################### Condition Switch #########################################
+####################################################################################################
 class ConditionSwitch:
+    """TODO"""
     def __init__(self, condition_lists: list[ConditionList], is_priority_ordered: bool):
         self.condition_lists = condition_lists
         self.is_priority_ordered = is_priority_ordered
 
     def is_condition_switch_satisfiable(self) -> OptionalTokenMap:
+        """TODO"""
         if not self.is_priority_ordered:
             # We don't care that the original list is lost
             random.shuffle(self.condition_lists)

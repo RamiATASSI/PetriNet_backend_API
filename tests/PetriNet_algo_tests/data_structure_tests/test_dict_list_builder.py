@@ -129,7 +129,7 @@ class DictListBuilderTest(unittest.TestCase):
         d_build: dict[int, list[int]] = d.build()
         d.append(1,16)
         d.append(2, 20)
-        self.assertListEqual(d_build.get(1), [10, 11, 12,13, 14, 15])
+        self.assertListEqual(d_build[1], [10, 11, 12,13, 14, 15])
         self.assertListEqual(d.get(1), [10, 11, 12, 13, 14, 15, 16])
         self.assertListEqual(d.get(2), [20])
 

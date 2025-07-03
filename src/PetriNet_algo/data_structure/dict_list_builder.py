@@ -1,3 +1,5 @@
+"""TODO"""
+
 import copy
 from typing import TypeVar, Generic
 
@@ -8,7 +10,7 @@ class DictListBuilder(Generic[K, V]):
     TODO
     """
     def __init__(self):
-        self._dict: dict[K, list[V]] = {}
+        self.__dict__: dict[K, list[V]] = {}
 
     def append(self, key: K, value: V) -> None:
         """
@@ -17,10 +19,10 @@ class DictListBuilder(Generic[K, V]):
         :param value:
         :return:
         """
-        if key in self._dict:
-            self._dict[key].append(value)
+        if key in self.__dict__:
+            self.__dict__[key].append(value)
         else:
-            self._dict[key] = [value]
+            self.__dict__[key] = [value]
 
     def append_all(self, key: K, values: list[V]) -> None:
         """
@@ -29,11 +31,11 @@ class DictListBuilder(Generic[K, V]):
         :param values:
         :return: Something
         """
-        if key in self._dict:
+        if key in self.__dict__:
             for v in values:
                 self.append(key, v)
         else:
-            self._dict[key] = values
+            self.__dict__[key] = values
 
     def append_map(self, other: dict[K, list[V]]) -> None:
         """TODO"""
@@ -42,44 +44,47 @@ class DictListBuilder(Generic[K, V]):
 
     def merge_with(self, other: 'DictListBuilder') -> None:
         """TODO"""
-        for key in other._dict:
-            self.append_all(key, other._dict[key])
+        for key in other.__dict__:
+            self.append_all(key, other.__dict__[key])
 
     def remove(self, key: K, value: V) -> None:
         """TODO"""
-        if key in self._dict.keys():
-            if value in self._dict[key]:
-                self._dict[key].remove(value)
-                if not self._dict[key]:
-                    self._dict.pop(key)
+        if key in self.__dict__:
+            if value in self.__dict__[key]:
+                self.__dict__[key].remove(value)
+                if not self.__dict__[key]:
+                    self.__dict__.pop(key)
             else:
-                raise ValueError("The Value {} was not in the list for Key {}".format(value, key))
+                raise ValueError(f"The Value {value} was not in the list for Key {key}")
         else:
-            raise KeyError("The Key {} was not in this dict {}".format(key, self._dict.keys()))
+            raise KeyError(f"The Key {key} was not in this dict {self.__dict__}")
 
     def remove_all(self, key, values: list[V]) -> None:
         """TODO"""
-        if key in self._dict.keys():
+        if key in self.__dict__:
             for v in values:
-                if v in self._dict[key]:
-                    self._dict[key].remove(v)
+                if v in self.__dict__[key]:
+                    self.__dict__[key].remove(v)
                 else:
-                    raise ValueError("The Value {} was not in the list for Key {}".format(v, key))
-            if not self._dict[key]:
-                self._dict.pop(key)
+                    raise ValueError(f"The Value {v} was not in the list for Key {key}")
+            if not self.__dict__[key]:
+                self.__dict__.pop(key)
         else:
-            raise KeyError("The Key {} was not in this dict {}".format(key, self._dict.keys()))
+            raise KeyError(f"The Key {key} was not in this dict {self.__dict__}")
 
     def remove_map(self, other: dict[K, list[V]]) -> None:
+        """TODO"""
         for key in other:
             self.remove_all(key, other[key])
 
     def get(self, key: K) -> list[V]:
         """TODO"""
-        return self._dict[key]
+        return self.__dict__[key]
 
     def contains(self, key: K) -> bool:
-        return key in self._dict
+        """TODO"""
+        return key in self.__dict__
 
     def build(self) -> dict[K, list[V]]:
-        return copy.deepcopy(self._dict)
+        """TODO"""
+        return copy.deepcopy(self.__dict__)
