@@ -80,35 +80,63 @@ class Place:
         self.check_valid_type(token_type)
         return self.counts.get(token_type, 0)
 
-    '''
-    Remove "count" number of tokens matching the given type (or any subtype of it).
-    Returns a list of tokens removed.
-    Raises ValueError if attempted to remove more tokens than available in the Place.
-    '''
-    def remove_tokens(self, token_type: str, count:int) -> list[Token]:
-        self.check_valid_type(token_type)
-        available = self.counts.get(token_type, 0)
-        if available < count:
+    # '''
+    # Remove "count" number of tokens matching the given type (or any subtype of it).
+    # Returns a list of tokens removed.
+    # Raises ValueError if attempted to remove more tokens than available in the Place.
+    # '''
+    # def remove_tokens(self, token_type: str, count:int) -> list[Token]:
+    #     self.check_valid_type(token_type)
+    #     available = self.counts.get(token_type, 0)
+    #     if available < count:
+    #         raise ValueError(
+    #             f"Not enough tokens: requested {count} of '{token_type}', but only {available} available"
+    #         )
+    #     # init list of removed tokens
+    #     removed_tokens = []
+    #     # get the deque of type to remove token from
+    #     deq = self.index.get(token_type)
+    #     for _ in range(count):
+    #         token = deq.popleft()
+    #         # remove from the root-level list if present
+    #         roots = self.tokens.get(token.token_type.type_name)
+    #         if roots and token in roots:
+    #             roots.remove(token)
+    #         else:
+    #             if hasattr(token, 'parent') and token.parent:
+    #                 token.parent.children.remove(token)
+    #         # update counts and index deques of all types affected
+    #         self.deregister_token(token)
+    #         removed_tokens.append(token)
+    #     return removed_tokens
+
+    """
+    Remove a single instance of `token` from this place.
+    Raises ValueError if the token is not found.
+    """
+    def remove_token(self, token: Token) -> Token:
+        self.check_valid_type(token.token_type.type_name)
+        available = self.counts.get(token.token_type.type_name, 0)
+        if available <= 0:
             raise ValueError(
-                f"Not enough tokens: requested {count} of '{token_type}', but only {available} available"
+                f"No tokens of type '{token.token_type.type_name}' available in place '{self.place_name}'"
             )
-        # init list of removed tokens
-        removed_tokens = []
-        # get the deque of type to remove token from
-        deq = self.index.get(token_type)
-        for _ in range(count):
-            token = deq.popleft()
-            # remove from the root-level list if present
-            roots = self.tokens.get(token.token_type.type_name)
-            if roots and token in roots:
-                roots.remove(token)
-            else:
-                if hasattr(token, 'parent') and token.parent:
+        # remove from root-level list if present
+        roots = self.tokens.get(token.token_type.type_name)
+        if roots and token in roots:
+            roots.remove(token)
+        else:
+            if hasattr(token, 'parent') and token.parent:
+                try:
                     token.parent.children.remove(token)
-            # update counts and index deques of all types affected
-            self.deregister_token(token)
-            removed_tokens.append(token)
-        return removed_tokens
+                except ValueError:
+                    raise ValueError(
+                        f"Token {token} not found in place '{self.place_name}'"
+                    )
+        # update counts and index deques of all types affected
+        self.deregister_token(token)
+        return token
+
 
     def get_tokens(self) -> list[Token]:
         """
