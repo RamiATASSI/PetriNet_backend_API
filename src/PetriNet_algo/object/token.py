@@ -1,10 +1,10 @@
 import copy
 from abc import abstractmethod, ABC
-from typing import Callable
+from typing import Callable, Any
 
 type AttributeK = str
-type AttributeV = type
-type Attribute = dict[AttributeK, AttributeV]
+type AttributeV = tuple[type, Any]
+type Attributes = dict[AttributeK, AttributeV]
 
 
 class Token(ABC):
@@ -16,10 +16,10 @@ class Token(ABC):
     ----------
     token_type : TokenType
         the type of the Token.
-    attributes : dict[str, type]
+    attributes : list[Attribute]
         the attributes of the token, with their respective (Python) type.
     """
-    def __init__(self, token_type: 'TokenType', attributes: Attribute):
+    def __init__(self, token_type: 'TokenType', attributes: Attributes):
         self.token_type = token_type
         self.attributes = attributes
 
@@ -28,17 +28,10 @@ class Token(ABC):
         """A small function to determine if a function is a SuperToken (avoid casting and instance checking)"""
         pass
 
-    def merge(self, other: 'Token', ordering: Callable[[list['Token']], None]) -> 'SuperToken':
-        """Default merge: only SuperToken supports merging."""
-        raise TypeError(f"Cannot merge into non-super token {self!r} !")
-
-    def split(self, selector: Callable[['SuperToken'], 'Token']) -> ('SuperToken', "Token"):
-        """Default split: only SuperToken supports splitting."""
-        raise TypeError(f"Cannot split non-super token {self!r} !")
-
     @abstractmethod
     def copy(self):
         """Create a deep copy of the (attributes of the) token. The Type copy isn't deep."""
+        pass
 
 class SimpleToken(Token):
     """
@@ -51,7 +44,7 @@ class SimpleToken(Token):
     attributes : dict[str, type]
         the attributes of the token, with their respective (Python) type.
     """
-    def __init__(self, token_type: 'TokenType', attributes: dict[str, type]):
+    def __init__(self, token_type: 'TokenType', attributes: Attributes):
         super().__init__(token_type, attributes)
 
     def is_super_token(self) -> bool:
@@ -76,30 +69,25 @@ class SuperToken(Token):
     components : list[Token]
         the token that are in the `SuperToken`
     """
-    def __init__(self, token_type: 'TokenType', attributes: dict[str, type], components: list[Token]):
+    def __init__(self, token_type: 'TokenType', attributes: Attributes, components: list[Token]):
         super().__init__(token_type, attributes)
         self.components = components
 
     def is_super_token(self) -> bool:
         return True
     
-    def merge(self, other: Token, ordering: Callable[[list[Token]], None]) -> 'SuperToken':
+    def merge(self, other: Token) -> 'SuperToken':
        """
         Merge another token into this super-token. Returns the `self` SuperToken, now containing `other` as part of its components.
 
         Arguments:
-            other: The token to merge in.
-            ordering: The ordering of the tokens.
+            other: The token to merge in. The token will be put at the end of the list and will need potential reordering.
         """
-       # take token in the process of merging (other) and set its parent as the supertoken (self)
        other.parent = self
-       # append token (other) to the supertoken's (self) components list: supertoken owns the token
        self.components.append(other)
-       ordering(self.components)
-       # return supertoken
        return self
     
-    def split(self, selector: Callable[['SuperToken'], Token]) -> ('SuperToken', Token):
+    def split(self, selector: Callable[['SuperToken'], Token]) -> tuple['SuperToken', Token]:
         """
         Split off one component from this super-token.
         Returns a tuple of (modified_super_token, extracted_token).  Raises a ValueError if the selector returns a token not present in components.
@@ -134,12 +122,12 @@ class TokenType:
         parent:   immediate supertype or None if root (since some can be roots of their own trees)
         children: list of immediate subtypes
     """
-    def __init__(self, type_name: str, parent: 'TokenType' | None = None):
+    def __init__(self, type_name: str, parent: 'TokenType | None' = None):
         if type_name in type_set:
             raise ValueError(f"TokenType '{type_name}' already exists!")
         type_set.add(type_name)
         self.type_name: str = type_name
-        self.parent: 'TokenType' | None = None
+        self.parent: 'TokenType | None' = None
         self.children: list[TokenType] = []
         if parent is not None:
             parent.add_subtype(self)

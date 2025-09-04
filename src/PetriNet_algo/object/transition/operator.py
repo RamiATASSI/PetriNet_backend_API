@@ -1,12 +1,20 @@
 """
 TODO
+
+TODO This part might contains some 'defensive-programing' and some 'non-defensive-programing'.
+
+TODO Instead of Token having a `dict[str, (type, Any)]` (`{name: (type, value)}`), it would be
+ nice to have the attribute list defined in the TokenType, and the Token holding a
+ `dict[(str, type), Any]` (`{(name, type) : Value}`).
+
+TODO Some type hint could be better, such as precising Simple/Super-Token.
 """
 
 from abc import abstractmethod, ABC
 from typing import Callable
 from src.PetriNet_algo.data_structure.dict_list_builder import DictListBuilder
 from src.PetriNet_algo.object.place import PlaceId
-from src.PetriNet_algo.object.token import Token, AttributeK
+from src.PetriNet_algo.object.token import Token, AttributeK, SuperToken
 
 """A transformation/generator/selector function."""
 type Transformation = Callable[[Token | None], Token]
@@ -35,7 +43,7 @@ EMPTY_PACKET = (VOID_OUTPUT_ID, VOID_CHANNEL_ID, None)
 ####################################################################################################
 class Operator(ABC):
     """
-    A node inside the OperatorMatrix.
+    A node inside the OperatorGraph.
 
     Attributes
     ----------
@@ -81,16 +89,14 @@ class Operator(ABC):
 
     def __clear__(self):
         self.normal_input_channel = None
-        self.special_output_dest = None
+        self.special_input_channel = None
 
     @abstractmethod
     def __compute__(self) -> list[Packet]:
         """
         TODO
 
-        Return
-        ------
-        A tuple containing the Packet for the normal channel, and a Packet for the special channel.
+        :return: A tuple containing the Packet for the normal channel, and a Packet for the special channel.
         """
 
     @abstractmethod
@@ -142,8 +148,8 @@ class Transformer(Operator):
 
 class Duplicate(Operator):
     """TODO"""
-    def __init__(self, operator_id: OperatorId, special_output_dest: OperatorId):
-        super().__init__(operator_id, special_output_dest)
+    def __init__(self, operator_id: OperatorId, normal_output_dest: OperatorId, special_output_dest: OperatorId):
+        super().__init__(operator_id, normal_output_dest, special_output_dest)
 
     def __compute__(self) -> list[Packet]:
         return [
@@ -201,8 +207,8 @@ class Generator(Operator):
 
 class Consumer(Operator):
     """TODO"""
-    def __init__(self, operator_id: OperatorId, normal_output_dest: OperatorId):
-        super().__init__(operator_id, normal_output_dest)
+    def __init__(self, operator_id: OperatorId):
+        super().__init__(operator_id, VOID_CHANNEL_ID)
 
     def __compute__(self) -> list[Packet]:
         assert self.special_input_channel is None
@@ -217,17 +223,17 @@ class Merger(Operator):
     def __init__(self,
                  operator_id: OperatorId,
                  normal_output_dest: OperatorId,
-                 ordering: Callable[[list[Token]], None]
+                 ordering: Callable[[Token], None]
              ):
         super().__init__(operator_id, normal_output_dest)
-        self.ordering: Callable[[list[Token]], None] = ordering
+        self.ordering: Callable[[Token], None] = ordering
 
     def __compute__(self) -> list[Packet]:
         assert self.special_input_channel.is_super_token()
-        return [
-            (self.normal_output_dest, NORMAL_CHANNEL_ID,
-             self.special_input_channel.merge(self.normal_input_channel, self.ordering))
-        ]
+        self.special_input_channel.merge(self.normal_input_channel)
+        self.ordering(self.special_input_channel)
+
+        return [(self.normal_output_dest, NORMAL_CHANNEL_ID, self.special_input_channel)]
 
     def __is_computable__(self) -> bool:
         return self.normal_input_channel is not None and self.special_input_channel is not None
@@ -238,9 +244,10 @@ class Splitter(Operator):
     def __init__(self,
                  operator_id: OperatorId,
                  normal_output_dest: OperatorId,
+                 special_output_dest: OperatorId,
                  selector: Transformation
              ):
-        super().__init__(operator_id, normal_output_dest, transformation=selector)
+        super().__init__(operator_id, normal_output_dest, special_output_dest, transformation=selector)
 
     def __compute__(self) -> list[Packet]:
         assert self.normal_input_channel.is_super_token()
@@ -309,6 +316,9 @@ def get_batches(operators: list[Operator], inputs: list[OperatorId]) -> list[lis
         - Else, it cannot be added into the current batch and go to the next PotentialNode.
     """
     def get_operator_with_id(operator_id: OperatorId) -> Operator:
+        """
+        TODO
+        """
         for operator in operators:
             if operator.operator_id == operator_id:
                 return operator

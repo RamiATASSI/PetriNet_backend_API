@@ -1,15 +1,15 @@
 import copy
 
-from PetriNet_algo.object.transition.condition import TokenMap
 from src.PetriNet_algo.object.token import Token
 from collections import deque # easier add/remove from both ends of a deque for tokens in a place
 
 
 type PlaceId = str # place_name
+type TokenMap = dict[PlaceId, list[Token]]
 
 
 class Place:
-    def _init_(self, place_name, type_forest):
+    def __init__(self, place_name, type_forest):
         self.place_name: str = place_name
         self.type_forest = type_forest
         # lists of mappings of root level tokens: token type -> root level token list
@@ -22,7 +22,7 @@ class Place:
         self.index: dict[str, deque[Token]] = {}
 
     '''
-      Ensure the given type exists in the type forest. Raise TypeError if type not found
+      Ensure the given type exists in the type forest. Raise TypeError if type not found.
     '''
     def check_valid_type(self, type_name):
         # get_descendants returns an empty list for unknown types

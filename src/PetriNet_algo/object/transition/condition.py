@@ -5,12 +5,12 @@ import random
 from typing import Callable
 
 from PetriNet_algo.data_structure.dict_list_builder import DictListBuilder
-from PetriNet_algo.object.place import Place
+from PetriNet_algo.object.place import Place, TokenMap
 from src.PetriNet_algo.object.token import Token
 from src.PetriNet_algo.object.transition.operator import OperatorId, PlaceId
 
 type ConditionId = int
-type TokenMap = dict[PlaceId, list[Token]]
+
 type OptionalTokenMap = None | TokenMap
 
 ####################################################################################################
