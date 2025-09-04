@@ -2,9 +2,6 @@ import unittest
 
 from PetriNet_algo.data_structure.dict_list_builder import DictListBuilder
 
-if __name__ == '__main__':
-    unittest.main()
-
 class DictListBuilderTest(unittest.TestCase):
     def test_dict_list_builder_append(self):
         d = DictListBuilder[int, int]()
@@ -146,3 +143,6 @@ class DictListBuilderTest(unittest.TestCase):
         self.assertListEqual(d1.get(1), [10, 11, 12, 10, 11, 12])
         self.assertListEqual(d1.get(2), [20, 21, 22])
         self.assertListEqual(d1.get(3), [30, 31, 32])
+
+if __name__ == '__main__':
+    unittest.main()
