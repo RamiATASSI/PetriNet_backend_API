@@ -1,4 +1,8 @@
-"""TODO"""
+"""
+TODO
+
+TODO This part might contains some 'defensive-programing' and some 'non-defensive-programing'.
+"""
 from PetriNet_algo.object.transition.condition import OptionalTokenMap
 from PetriNet_algo.petriNet import PlaceDict
 from src.PetriNet_algo.object.place import Place
