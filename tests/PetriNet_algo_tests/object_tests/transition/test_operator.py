@@ -3,7 +3,7 @@ import unittest
 from PetriNet_algo.object.token import SimpleToken, TokenType, Token, SuperToken
 from PetriNet_algo.object.transition.operator import Move, Transformer, Duplicate, Import, \
     Generator, Consumer, Merger, Splitter, Output, VOID_CHANNEL_ID, NORMAL_CHANNEL_ID, Operator, \
-    OperatorId, SPECIAL_CHANNEL_ID, Packet
+    OperatorId, SPECIAL_CHANNEL_ID, Packet, get_batches
 
 
 class OperatorTest(unittest.TestCase):
@@ -45,6 +45,9 @@ class OperatorTest(unittest.TestCase):
         self.assertEqual(first[1], second[1])
         self.assertEqualToken(first[2], second[2])
 
+####################################################################################################
+############################################# Operator #############################################
+####################################################################################################
     def test_move(self):
         t = SimpleToken(TokenType("BasicMove"), {})
         op_id, out_norm_id = 10, 11
@@ -221,9 +224,114 @@ class OperatorTest(unittest.TestCase):
         self.check_op_is_clear(op)
 
     def test_output(self):
-        # TODO
-        self.assertTrue(True)
+        t = SimpleToken(TokenType("BasicOutput"), {})
+        op_id, place_id = 10, "out_place"
+        op = Output(op_id, place_id)
 
+        self.check_init(op, op_id, VOID_CHANNEL_ID, VOID_CHANNEL_ID)
+
+        op.ingest_packet((op_id, NORMAL_CHANNEL_ID, t))
+        self.assertEqual(t, op.normal_input_channel)
+        self.assertEqual(None, op.special_input_channel)
+
+        self.assertRaises(RuntimeError, lambda: op.__compute__())
+        self.assertEqual([], op.compute())
+
+        tm = op.retrieve()
+
+        self.assertEqual(len(tm), 1)
+        self.assertEqual(tm["out_place"], t)
+
+        self.check_op_is_clear(op)
+
+####################################################################################################
+########################################## Operator Graph ##########################################
+####################################################################################################
+class GetBatches(unittest.TestCase):
+    def assertEqualBatches(self, first: list[list[Operator]], second: list[list[Operator]]):
+        # Print statements helps for debugging, stack track is empty.
+        for i, batch in enumerate(first):
+            #print(f"\nFirst >Batch {i} : {[op.operator_id for op in batch]}")
+            #print(f"Second>Batch {i} : {[op.operator_id for op in second[i]]}")
+            for j, op in enumerate(batch):
+                self.assertTrue(second[i].__contains__(op))
+            #print(f"Batch {i} is correct (first->second)")
+
+        for i, batch in enumerate(second):
+            #print(f"First >Batch {i} : {[op.operator_id for op in batch]}")
+            #print(f"Second>Batch {i} : {[op.operator_id for op in second[i]]}")
+            for j, op in enumerate(batch):
+                self.assertTrue(first[i].__contains__(op))
+            #print(f"Batch {i} is correct (second->first)")
+
+    def test_get_batches_empty(self):
+        empty_batches = get_batches([], [])
+        self.assertEqual([], empty_batches)
+
+    def test_get_batches_trivial(self):
+        op = Output(0, "")
+        batches = get_batches([op], [0])
+        self.assertEqual([[op]], batches)
+
+    def test_get_batches_generator(self):
+        ttype = TokenType("BasicGenerator")
+        a = Generator(0, 1, lambda _ : SimpleToken(ttype, {}))
+        b = Output(1, "")
+        batches = get_batches([a, b], [])
+        self.assertEqual([[a], [b]], batches)
+
+    def test_get_batches_consumer(self):
+        op = Consumer(0)
+        batches = get_batches([op], [0])
+        self.assertEqual([[op]], batches)
+
+    def test_get_batches_simple(self):
+        # A --- C --- E
+        #          /
+        # B --- D --- F
+        #    \-----/
+        a_id, b_id, c_id, d_id, e_id, f_id = 1, 2, 3, 4, 5, 6
+        a = Move(a_id, c_id)
+        b = Duplicate(b_id, d_id, f_id)
+        c = Move(c_id, e_id)
+        d = Duplicate(d_id, e_id, f_id)
+        e = Output(e_id, "")
+        f = Output(f_id, "")
+
+        batches = get_batches([a, b, c, d, e, f], [a_id, b_id])
+
+        self.assertEqual([[a, b], [c, d], [e, f]], batches)
+
+    def test_get_batches_advanced(self):
+        # Figure 14 of the report: Trouple with cat
+        family_t = TokenType("Family")
+        # Woman --------------/=== I2 --- T2\
+        # Man   --- D1  --- D2 --- T1 \      \
+        # Cat   ------\==== I1         \      \
+        #           GEN ------\=== M1 --- M2 --- M3 --- O
+        #
+        d1_id, d2_id, gen_id, i1_id, i2_id, t1_id, t2_id, m1_id, m2_id, m3_id, o_id = 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11
+        mo1 = Move(100, i2_id)
+        mo2 = Move(101, i1_id)
+        d1 = Duplicate(d1_id, d2_id, i1_id)
+        d2 = Duplicate(d2_id, t1_id, i2_id)
+        gen = Generator(gen_id, m1_id, lambda _: SuperToken(family_t, {}, []))
+        i1 = Import(i1_id, m1_id, 'Last Name', 'Owner')
+        i2 = Import(i2_id, t2_id, 'Last Name', 'Last Name')
+        def just_married(t: Token) -> Token:
+            t.attributes['Marital Status'] = (str, "Married")
+        t1 = Transformer(t1_id, m2_id, just_married)
+        t2 = Transformer(t2_id, m3_id, just_married)
+        def ordering(token: Token) -> None:
+            token.components.sort(key=lambda st: st.attributes['Last Name'])
+        m1 = Merger(m1_id, m2_id, ordering)
+        m2 = Merger(m2_id, m3_id, ordering)
+        m3 = Merger(m3_id, o_id, ordering)
+        o = Output(o_id, "")
+
+        batches = get_batches([mo1, mo2, d1, d2, gen, i1, i2, t1, t2, m1, m2, m3, o], [1, 100, 101])
+
+        self.assertEqualBatches([[gen], [mo1, mo2, d1], [d2, i1], [i2, t1, m1], [t2, m2], [m3], [o]], batches)
 
 if __name__ == '__main__':
     unittest.main()

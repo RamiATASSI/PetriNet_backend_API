@@ -11,6 +11,7 @@ TODO Some type hint could be better, such as precising Simple/Super-Token.
 """
 
 from abc import abstractmethod, ABC
+from dataclasses import dataclass
 from typing import Callable
 from src.PetriNet_algo.data_structure.dict_list_builder import DictListBuilder
 from src.PetriNet_algo.object.place import PlaceId
@@ -266,10 +267,9 @@ class Output(Operator):
     """TODO"""
     def __init__(self,
                  operator_id: OperatorId,
-                 normal_output_dest: OperatorId,
                  dest_place: PlaceId
              ):
-        super().__init__(operator_id, normal_output_dest)
+        super().__init__(operator_id, VOID_CHANNEL_ID)
         self.dest_place = dest_place
 
     def __compute__(self) -> list[Packet]:
@@ -282,7 +282,9 @@ class Output(Operator):
         """
         TODO
         """
-        return dict([(self.dest_place, self.normal_input_channel)])
+        tokens_to_output = dict([(self.dest_place, self.normal_input_channel)])
+        self.__clear__()
+        return tokens_to_output
 
 
 ####################################################################################################
@@ -315,6 +317,8 @@ def get_batches(operators: list[Operator], inputs: list[OperatorId]) -> list[lis
             - Move its output destinations from RemainingNodes to PotentialNodes for the next batch.
         - Else, it cannot be added into the current batch and go to the next PotentialNode.
     """
+    if not operators:
+        return []
     def get_operator_with_id(operator_id: OperatorId) -> Operator:
         """
         TODO
@@ -324,116 +328,107 @@ def get_batches(operators: list[Operator], inputs: list[OperatorId]) -> list[lis
                 return operator
         raise ValueError(f"Operator with ID {operator_id} not found")
 
-    # TODO Last batch should be the "output" operators.
-    # TODO Update doc about above TODO.
-    operator_number = len(operators)
-    # Put generators in the first batch and input inside the second batch
-    batches: list[list[Operator]] = [
-        [operator for operator in operators if type(operator) is Generator],
-        [operator for operator in operators if operator.operator_id in inputs]
-    ]
-    init_batches: list[Operator] = batches[0]
-    init_batches.extend(batches[1])
+    batch0 = [op for op in operators if type(op) is Generator]
+    batch1 = [op for op in operators if op.operator_id in inputs and type(op) is not Output]
+    batch9 = [op for op in operators if type(op) is Output]
+    leftover_op = [op for op in operators if op not in batch0 + batch1 + batch9]
 
-    # Initialization of the algorithm
-    leaf_connections: set[tuple[OperatorId, ChannelId]] = set()
-    for op in init_batches:
-        if type(op) in [Move, Transformer, Merger]:
-            leaf_connections.add((op.normal_output_dest, NORMAL_CHANNEL_ID))
-        elif type(op) is Splitter:
-            leaf_connections.add((op.normal_output_dest, NORMAL_CHANNEL_ID))
-            leaf_connections.add((op.special_output_dest, SPECIAL_CHANNEL_ID))
-        elif type(op) in [Consumer, Generator]:
+    if not batch0 and not batch1:
+        # There are no input and no generator -> the graph should only pure outputs
+        assert not leftover_op
+        return [batch9]
+
+    # Getting all connections
+    batch0_connection: list[tuple[int, int]] = []
+    batch1_connection: list[tuple[int, int]] = []
+    connections: list[tuple[int, int]] = []
+    for op in operators:
+        t = type(op)
+        if t in [Consumer, Output]:
             pass
-        else:
-            raise TypeError(f"op is not a Operator : {type(op)} | {str(op)}")
-
-    potential_nodes: set[Operator] = set()
-    for leaf_connection in leaf_connections:
-        potential_nodes.add(get_operator_with_id(leaf_connection[0]))
-
-    remaining_nodes: set[Operator] = set(operators.copy())
-    for batch in batches: # Removing operators already in batches
-        for op in batch:
-            remaining_nodes.remove(op)
-    for op in potential_nodes: # Removing operators in potential_node
-        remaining_nodes.remove(op)
-
-    next_potential_nodes: set[Operator] = set()
-    while sum([len(batch) for batch in batches]) < operator_number:
-        batches.append([])
-
-        for potential_node in potential_nodes:
-            if type(potential_node) in [Move, Transformer]:
-                if leaf_connections.__contains__((potential_node.operator_id, NORMAL_CHANNEL_ID)):
-                    batches[-1].append(potential_node)
-
-                    leaf_connections.add((potential_node.normal_output_dest, NORMAL_CHANNEL_ID))
-
-                    next_node = get_operator_with_id(potential_node.normal_output_dest)
-                    remaining_nodes.remove(next_node)
-                    next_potential_nodes.add(next_node)
-                else:
-                    next_potential_nodes.add(potential_node)
-            elif type(potential_node) is Consumer:
-                if leaf_connections.__contains__((potential_node.operator_id, NORMAL_CHANNEL_ID)):
-                    batches[-1].append(potential_node)
-
-                    # No next node
-                else:
-                    next_potential_nodes.add(potential_node)
-            elif type(potential_node) is Generator:
-                raise RuntimeError("Generator should already in the first batch, but ")
-            #elif type(potential_node) is Transformer:
-            #    pass
-            elif type(potential_node) is Merger:
-                if leaf_connections.__contains__((potential_node.operator_id, NORMAL_CHANNEL_ID))\
-                        and leaf_connections.__contains__(
-                            (potential_node.operator_id, SPECIAL_CHANNEL_ID)
-                        ):
-                    batches[-1].append(potential_node)
-
-                    leaf_connections.add((potential_node.normal_output_dest, NORMAL_CHANNEL_ID))
-
-                    next_node_normal = get_operator_with_id(potential_node.normal_output_dest)
-                    next_node_special = get_operator_with_id(potential_node.special_output_dest)
-                    remaining_nodes.remove(next_node_normal)
-                    remaining_nodes.remove(next_node_special)
-                    next_potential_nodes.add(next_node_normal)
-                    next_potential_nodes.add(next_node_special)
-                else:
-                    next_potential_nodes.add(potential_node)
-            elif type(potential_node) is Splitter:
-                if leaf_connections.__contains__((potential_node.operator_id, NORMAL_CHANNEL_ID)):
-                    batches[-1].append(potential_node)
-
-                    leaf_connections.add((potential_node.normal_output_dest, NORMAL_CHANNEL_ID))
-                    leaf_connections.add((potential_node.special_output_dest, SPECIAL_CHANNEL_ID))
-
-                    next_node = get_operator_with_id(potential_node.normal_output_dest)
-                    remaining_nodes.remove(next_node)
-                    next_potential_nodes.add(next_node)
-                else:
-                    next_potential_nodes.add(potential_node)
+        elif t in [Generator]:
+            batch0_connection.append((op.operator_id, op.normal_output_dest))
+        elif t in [Move, Transformer, Import, Merger]:
+            if op.operator_id in inputs:
+                batch1_connection.append((op.operator_id, op.normal_output_dest))
             else:
-                raise TypeError(f"potential_node is not an operator : {type(potential_node)} "
-                                f"| {str(potential_node)}")
+                connections.append((op.operator_id, op.normal_output_dest))
+            pass
+        elif t in [Duplicate, Splitter]:
+            if op.operator_id in inputs:
+                batch1_connection.append( (op.operator_id, op.normal_output_dest) )
+                batch1_connection.append((op.operator_id, op.special_output_dest))
+            else:
+                connections.append( (op.operator_id, op.normal_output_dest) )
+                connections.append((op.operator_id, op.special_output_dest))
+        else:
+            raise TypeError(f"Operator {op.operator_id} is not an operator")
 
-            potential_nodes.clear()
-            potential_nodes = next_potential_nodes.copy()
-            next_potential_nodes.clear()
-        # END for potential_node in potential_nodes:
-    # END while sum([len(batch) for batch in batches]) < operator_number:
+    # Initialization from batch0 and 1 : Taking not already fulfilled connection between batch0 and 1
+    open_connections: list[tuple[int, int]] = [c for c in batch0_connection + batch1_connection if c[1] not in inputs]
+    double_connections: list[tuple[int, int]] = []
+    batches: list[list[Operator]] = [batch0, batch1]
 
+
+    # From open_connections, get nodes (potentially satisfiable)
+    # In the nodes, check for input arity
+    #  if 1, is satisfiable
+    #  if 2, check in "double_connection_list" if there is already a connection there
+    #       if yes, then satisfiable
+    #       if not, add connection to "double_connection_list"
+    while len(leftover_op) > 0:
+        current_batch = []
+        used_connections = []
+        new_connections = []
+        for c in open_connections:
+            dest = c[1]
+            op = get_operator_with_id(dest)
+
+            def op_is_satisfiable(op: Operator, tipe: type) -> None:
+                if t is not Output:
+                    current_batch.append(op)
+                    leftover_op.remove(op)
+
+                if tipe in [Move, Transformer, Import, Merger]:
+                    new_connections.append((op.operator_id, op.normal_output_dest))
+                elif tipe in [Duplicate, Splitter]:
+                    new_connections.append((op.operator_id, op.normal_output_dest))
+                    new_connections.append((op.operator_id, op.special_output_dest))
+                elif tipe in [Consumer, Output]:
+                    pass
+                else:
+                    raise TypeError(f"Operator {op.operator_id} is not an operator")
+
+            t = type(op)
+            if t in [Move, Transformer, Duplicate, Splitter, Consumer, Output]:
+                # Single input - directly satisfiable
+                op_is_satisfiable(op, t)
+            elif t in [Import, Merger]:
+                # Double input - check for two connections
+                if c[1] in [d for (o, d) in double_connections]:
+                    op_is_satisfiable(op, t)
+                    double_connections = [dc for dc in double_connections if dc[1] != c[1]]
+                else:
+                    double_connections.append(c)
+            elif t in [Generator]:
+                raise RuntimeError(f"Generator {dest} is a destination.")
+            else:
+                raise TypeError(f"Operator {dest} is not an operator")
+            used_connections.append(c)
+
+        open_connections = [oc for oc in open_connections if oc not in used_connections]
+        open_connections.extend(new_connections.copy())
+        batches.append(current_batch.copy())
+
+    batches.append(batch9)
+
+    # Potential Shrinking of the batches 0 and 1
     # TODO
-    #  Assert all operators are in a batch
-    #  Assert all outputs are in the last batch
-    #  Assert No dependence in the first batch
 
-    # TODO A compacter ?
+    # Removing empty batches (notably generator, inputs and outputs)
+    batches = [b for b in batches if b]
 
     return batches
-
 
 class OperatorGraph:
     """
