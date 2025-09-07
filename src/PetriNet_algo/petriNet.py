@@ -1,247 +1,281 @@
-"""TODO"""
-import time
-import numpy as np
+from typing import Dict, List
 
-from PetriNet_algo.object.place import PlaceId, Place
-
-
-type PlaceDict = dict[PlaceId, Place]
-
-VERBOSE_LEVEL = 0
+from src.PetriNet_algo.object.place import Place, PlaceId
+from src.PetriNet_algo.object.transition import Transition
 
 
 class PetriNet:
-    """TODO"""
-    def __init__(self, colors, places, transitions):
-        self.colors = colors
+    """
+    A Petri net with:
+    type_forest: the TypeForest of all token types
+    places:       map of PlaceId to Place
+    transitions:  map of transition name to Transition
+    """
+
+    def __init__(
+        self,
+        type_forest,
+        places: Dict[PlaceId, Place],
+        transitions: Dict[str, Transition]
+    ):
+        self.type_forest = type_forest
         self.places = places
-        self.place_dict: PlaceDict = { place.id:place for place in self.places } # TODO Use when calling Transitions functions
+        self.place_dict = places
         self.transitions = transitions
 
-        self.sensitive_transitions = []
-        self.triggered_transitions = []
-        self.added_colors = {}
-        for place in self.places.values():
-            self.added_colors[place] = place.get_colors()
+        
+        self.sensitive_transitions: List[Transition] = []
+        self.triggered_transitions: List[Transition] = []
 
-    def print_details(self):
-        """TODO"""
-        if VERBOSE_LEVEL == 2:
-            for places in self.places.values():
-                places.describe()
-            for transitions in self.transitions.values():
-                transitions.describe()
+        #first sensitization pass
+        self._update_sensitized()
 
-    # activate the actions of the places that have been activated
-    def activate(self):
-        """TODO"""
-        if VERBOSE_LEVEL:
-            print("Phase 0")
-            print("activating")
-            self.print_details()
-
-        for place, colors in self.added_colors.items():
-            for color in colors:
-                if VERBOSE_LEVEL:
-                    print("Activating place: ", place)
-                    print("Color: ", color)
-                place.launch_action(color)
-
-    # populates the list of sensitive transitions
-    def sensitize(self):
-        """TODO"""
-        if VERBOSE_LEVEL:
-            print("Phase 1")
-            print("sensitizing")
-            self.print_details()
-        self.sensitive_transitions = []
-        for transition in self.transitions.values():
-            if transition.check_sensitization():
-                self.sensitive_transitions.append(transition)
-
-    # check if some of the sensitive transitions are triggered and add them to the list if they are
-    def trigger(self):
-        """TODO"""
-        if VERBOSE_LEVEL:
-            print("Phase 2")
-            print("triggering")
-            self.print_details()
-        self.triggered_transitions = []
-        self.retrigger()
-        if VERBOSE_LEVEL:
-            print("after triggering")
-            self.print_details()
-
-    def retrigger(self):
-        """TODO"""
-        # randomize sensitive transitions
-        np.random.shuffle(self.sensitive_transitions)
-
-        for transition in self.sensitive_transitions:
-            if transition.check_triggered():
-                if VERBOSE_LEVEL:
-                    print("Transition " + str(transition) + " with condition " +
-                          transition.triggering_event + " triggered")
-
-                self.triggered_transitions.append(transition)
-                self.sensitive_transitions.remove(transition)
-
-                if VERBOSE_LEVEL > 1:
-                    print("Before consumption: ")
-                    self.print_details()
-                transition.consume_tokens()
-                if VERBOSE_LEVEL > 1:
-                    print("After consumption: ")
-                    self.print_details()
-                    print("sensitive_transitions: ", self.sensitive_transitions)
-                self.sensitive_transitions = [transition for transition in self.sensitive_transitions if
-                                              transition.check_sensitization()]
-
-                if VERBOSE_LEVEL:
-                    print("new sensitive_transitions after resesitizing: ",
-                          [str(transition) for transition in self.sensitive_transitions])
-                self.retrigger()
-                break
-
-    def produce(self):
-        """TODO"""
-        if VERBOSE_LEVEL:
-            print("Phase 2")
-            print("producing")
-            self.print_details()
-        self.added_colors = {}
-        for transition in self.triggered_transitions:
-            transition_added_colors = transition.produce_tokens()
-
-            for place, colors in transition_added_colors.items():
-                if place not in self.added_colors:
-                    self.added_colors[place] = set()
-                self.added_colors[place].update(colors)
-
-        if VERBOSE_LEVEL:
-            print("After production: ")
-            self.print_details()
+    def _update_sensitized(self):
+        self.sensitive_transitions = [
+            t for t in self.transitions.values()
+            if t.check_sensitization()
+        ]
 
     def tic(self):
-        """TODO"""
-        self.activate()
-        self.sensitize()
-        self.trigger()
-        self.produce()
+        """
+        One firing step:
+        Recompute sensitized transitions. For each sensitized transition:
+        1.consume tokens via ConditionSwitch
+        2. apply its OperatorGraph to produce new tokens
+        3. make sure tokens are in the correct places as outputs their output places
+        """
+        self._update_sensitized()
+        fired = []
+        for t in self.sensitive_transitions:
+            consumed = t.consume_tokens(self.place_dict)
+            if consumed is None:
+                continue
+            produced = t.produce_tokens()
+            for pl_name, toks in produced.items():
+                self.place_dict[pl_name].add_tokens(toks)
+            fired.append(t)
+        self.triggered_transitions = fired
+        # after firing, recompute sensitization
+        self._update_sensitized()
+
+    def print_details(self):
+        print("Places")
+        for name, place in self.places.items():
+            toks = place.get_tokens()
+            print(f"  {name}: {[str(t) for t in toks]}")
+        print("Sensitive Transitions")
+        print([t.transition_name for t in self.sensitive_transitions])
+        print("Last Fired")
+        print([t.transition_name for t in self.triggered_transitions])
 
 
-def main() -> None:
-    """TODO"""
-    transitions_json = {
-        'Transition1':
-            {
-                'Token_Consumption':
-                    {
-                        'Place1':
-                            {
-                                'Color1': 1,
-                                'Color2': 1
-                            },
-                        'Place2':
-                            {
-                                'Color2': 1
-                            }
-                    },
-                'Triggering_Event': 'True',
-                'Token_Production':
-                    {
-                        'Place2':
-                            {
-                                'Color1': 2,
-                                'Color2': 1
-                            },
-                    }
-            },
-        'Transition2':
-            {
-                'Token_Consumption':
-                    {
-                        'Place1':
-                            {
-                                'Color1': 1,
-                                'Color2': 1
-                            },
-                    },
-                'Triggering_Event': 'True',
-                'Token_Production':
-                    {
-                        'Place2':
-                            {
-                                'Color1': 1,
-                                'Color2': 1
-                            },
-                    }
-            }
+def main():
+    """
+    Demo of marry and adopt cat:
+    """
+
+    types_json = {
+        "LivingBeing": {"parent": None},
+        "Human":       {"parent": "LivingBeing"},
+        "Animal":      {"parent": "LivingBeing"},
+        "Man":         {"parent": "Human"},
+        "Woman":       {"parent": "Human"},
+        "Cat":         {"parent": "Animal"},
+        "Family":      {"parent": None},
     }
+
 
     places_json = {
-        'Place1':
-            {
-                'Color1':
-                    {
-                        'Tokens_nbr': 2,
-                        'Action': "function11"
-                    },
-                'Color2':
-                    {
-                        'Tokens_nbr': 2,
-                        'Action': "function21"
-                    }
-            },
-        'Place2':
-            {
-                'Color1':
-                    {
-                        'Tokens_nbr': 0,
-                        'Action': "function12"
-                    },
-                'Color2':
-                    {
-                        'Tokens_nbr': 0,
-                        'Action': "function22"
-                    }
-            }
+        "Start": {
+            "initial_tokens": [
+                {"type": "Man",   "attributes": {"lastName": "Smith"}},
+                {"type": "Woman", "attributes": {"lastName": "Clark"}},
+                {"type": "Cat",   "attributes": {"name": "Nala"}}
+            ]
+        },
+        "End": {"initial_tokens": []}
     }
 
-    colors_json = {
-        "Color1":
-            {
-                "class_name": "Humans",
-                "attributes": [
-                    {"attribute_name": "attribute11", "attribute_value": "1"},
-                    {"attribute_name": "attribute12", "attribute_value": "'value1'"}],
-                "functions": [
-                    {"function_name": "function11", "function_core": "return self.attribute11"},
-                    {"function_name": "function12", "function_core": "self.attribute11 = 3; print(self.attribute11)"}]
+
+    transitions_json = {
+        "marry_and_adopt": {
+            "condition_switch": {
+                "hasPriorityOrder": True,
+                "conditionLists": [
+                    {
+                        "conditions": [
+                            {
+                                "id": "c_man",
+                                "consumption": {"Start": ["Man"]},
+                                "predicate": "true",
+                                "outputs": ["op_gen_family", "op_set_married_man", "op_merge_man"]
+                            },
+                            {
+                                "id": "c_woman",
+                                "consumption": {"Start": ["Woman"]},
+                                "predicate": "true",
+                                "outputs": ["op_copy_last_name_to_woman", "op_set_married_woman", "op_merge_woman"]
+                            },
+                            {
+                                "id": "c_cat",
+                                "consumption": {"Start": ["Cat"]},
+                                "predicate": "true",
+                                "outputs": ["op_copy_last_name_to_cat", "op_merge_cat"]
+                            }
+                        ]
+                    }
+                ]
             },
-        "Color2":
-            {
-                "class_name": "Animals",
-                "attributes": [
-                    {"attribute_name": "attribute21", "attribute_value": "2"},
-                    {"attribute_name": "attribute22", "attribute_value": "'value2'"}],
-                "functions": [
-                    {"function_name": "function21", "function_core": "return self.attribute21"},
-                    {"function_name": "function22", "function_core": "print('prout')"}]
+            "operator_graph": {
+                "operators": [
+                    # Create a Family token based on an incoming token
+                    {
+                        "id": "op_gen_family",
+                        "dest": "End",
+                        "transform": "generate_family",
+                        "inputChannels":  {"normal": True},
+                        "outputChannels": {"normal": True}
+                    },
+                    # Attribute updates on the humans
+                    {
+                        "id": "op_set_married_man",
+                        "dest": "End",
+                        "transform": "set_married",
+                        "inputChannels":  {"normal": True},
+                        "outputChannels": {"normal": True}
+                    },
+                    {
+                        "id": "op_set_married_woman",
+                        "dest": "End",
+                        "transform": "set_married",
+                        "inputChannels":  {"normal": True},
+                        "outputChannels": {"normal": True}
+                    },
+                    # Copy family last name to Woman / Cat before merging them into Family
+                    {
+                        "id": "op_copy_last_name_to_woman",
+                        "dest": "End",
+                        "transform": "copy_last_name",
+                        "inputChannels":  {"normal": True},
+                        "outputChannels": {"normal": True}
+                    },
+                    {
+                        "id": "op_copy_last_name_to_cat",
+                        "dest": "End",
+                        "transform": "copy_last_name",
+                        "inputChannels":  {"normal": True},
+                        "outputChannels": {"normal": True}
+                    },
+                    # Merge each into the Family token
+                    {
+                        "id": "op_merge_cat",
+                        "dest": "End",
+                        "transform": "merge_into_family",
+                        "inputChannels":  {"normal": True},
+                        "outputChannels": {"normal": True}
+                    },
+                    {
+                        "id": "op_merge_man",
+                        "dest": "End",
+                        "transform": "merge_into_family",
+                        "inputChannels":  {"normal": True},
+                        "outputChannels": {"normal": True}
+                    },
+                    {
+                        "id": "op_merge_woman",
+                        "dest": "End",
+                        "transform": "merge_into_family",
+                        "inputChannels":  {"normal": True},
+                        "outputChannels": {"normal": True}
+                    }
+                ],
+                "edges": [
+                    # Family should be available to merges
+                    {"from": "op_gen_family",            "to": "op_merge_man"},
+                    {"from": "op_gen_family",            "to": "op_merge_woman"},
+                    {"from": "op_gen_family",            "to": "op_merge_cat"},
+
+                    # Name gets copied before merging
+                    {"from": "op_copy_last_name_to_woman","to": "op_merge_woman"},
+                    {"from": "op_copy_last_name_to_cat",  "to": "op_merge_cat"}
+                ]
             }
+        }
     }
 
-    petri_net = PetriNet(colors_json, places_json, transitions_json)
-    petri_net.print_details()
-    while True:
-        petri_net.tic()
-        time.sleep(1)
-    # Example usage
-    # timer1 = timerD.TimerD()
-    # timer2 = timerD.TimerD()
-    # temp_sensor1 = temp_sensor.TempSensor()
-    # arduino = arduinoControl.ArduinoControl('COM3')
+    # transfor registry
+    registry_ctx = {
+        "family_name": None,
+        "family_token": None,   
+        "types_json":  types_json,  #for debugging purposes
+    }
 
+    FamilyT = None
+    HumanT  = None
 
-if __name__ == '__main__':
+    def _ensure_family_seed():
+        """Create (or return existing) Family SuperToken accumulator."""
+        if registry_ctx["family_token"] is None:
+            lname = registry_ctx["family_name"] or "Family"
+            registry_ctx["family_token"] = SuperToken(FamilyT, {"lastName": lname}, [])
+        return registry_ctx["family_token"]
+
+    # transformations
+    def generate_family(tok):
+        if registry_ctx["family_name"] is None:
+            registry_ctx["family_name"] = tok.attributes.get("lastName") or "Family"
+        fam = _ensure_family_seed()
+        return fam
+
+    def set_married(tok):
+        tok.attributes["maritalStatus"] = "married"
+        return tok
+
+    def copy_last_name(tok):
+        lname = registry_ctx["family_name"] or tok.attributes.get("lastName") or "Family"
+        tok.attributes["lastName"] = lname
+        return tok
+
+    def merge_into_family(tok):
+        fam = _ensure_family_seed()
+        if tok.type.name in ("Man", "Woman"):
+            child = SimpleToken(HumanT, dict(tok.attributes))
+        else:
+            child = tok
+        # to avoid duplicates if called multiple times
+        if child not in fam.children:
+            fam.children.append(child)
+        return fam
+
+    # Build a registry of transformations
+    TRANSFORMS = {
+        "generate_family":    generate_family,
+        "set_married":        set_married,
+        "copy_last_name":     copy_last_name,
+        "merge_into_family":  merge_into_family,
+    }
+
+    # Attach them to OperatorGraph so objects.py can resolve by getattr()
+    for name, fn in TRANSFORMS.items():
+        setattr(OperatorGraph, name, fn)
+
+    # building the petri net
+    type_forest, places, transitions = jsons_to_objects(
+        types_json, places_json, transitions_json
+    )
+    FamilyT = type_forest.get_type("Family")
+    HumanT  = type_forest.get_type("Human")
+
+    net = PetriNet(type_forest, places, transitions)
+
+    # running demo
+    net.print_details("Before firing")
+    net.tic()
+    net.print_details("After one tick")
+
+    # should no longer be sensitized, since inputs are consumed
+    t = transitions["marry_and_adopt"]
+    print(f"\n'marry_and_adopt' sensitized after tick? {bool(t.check_sensitization())}")
+
+if __name__ == "__main__":
     main()

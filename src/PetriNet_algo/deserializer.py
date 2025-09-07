@@ -1,99 +1,78 @@
-import re
-import textwrap
+from src.PetriNet_algo.object.token import TypeForest
 
 
-class ColorDeserializer:
+class TypeForestDeserializer:
+    """
+    Builds a TypeForest (hierarchical token type forest) from JSON data.
+    Expects JSON mapping type names to optional parent names:
+      {
+        "TypeA": {"parent": None},
+        "SubType": {"parent": "TypeA"},
+        ...
+      }
+    """
+
     def __init__(self):
-        self.classes = {}
+        self.forest = TypeForest()
 
-    def compile(self, color_data):
-        class_code = self.generate_class_code(color_data)
-        instance = self.get_instance(class_code)
-        return instance
-
-    def get_instance(self, class_code: str):
-        try:
-            # Remove leading whitespace from the class code
-            class_code = textwrap.dedent(class_code)
-
-            # Execute the class code in the context of self.classes
-            exec(class_code, self.classes)
-
-            # Use regex to get the class name
-            class_name = re.search(r'class\s+(\w+)', class_code).group(1)
-
-            # Instantiate the class
-            instance = self.classes[class_name]()
-
-            return instance
-        except SyntaxError:
-            raise SyntaxError("Error: The provided class code is not valid Python code. {}".format(class_code))
-        except AttributeError:
-            raise AttributeError("Error: The class does not have a callable constructor.")
-        except TypeError:
-            raise TypeError("Error: The class's constructor is not callable.")
-        except NameError:
-            raise NameError("Error: The class is trying to access a name that is not defined.")
-        except Exception as e:
-            raise Exception(f"Unexpected error: {e}")
-
-    def generate_class_code(self, color_data):
-        class_name = color_data['class_name']
-        attributes = color_data['attributes']
-        functions = color_data['functions']
-
-        class_code = f"class {class_name}:\n"
-        
-        # Add default __init__ content if no attributes are provided
-        class_code += "    def __init__(self):\n"
-        if attributes:
-            for attribute in attributes:
-                attribute_name = attribute['attribute_name']
-                attribute_value = attribute['attribute_value']
-                class_code += f"        self.{attribute_name} = {attribute_value}\n"
-        else:
-            # Default init if no attributes
-            class_code += "        pass\n"
-
-        # Add functions if any are provided
-        if functions:
-            for function in functions:
-                function_name = function['function_name']
-                function_core = function['function_core']
-                arguments = function.get('arguments', '')
-                if arguments:
-                    arguments = 'self, ' + arguments
-                else:
-                    arguments = 'self'
-                class_code += f"    def {function_name}({arguments}):\n"
-                class_code += f"        {function_core}\n"
-        else:
-            # Add a placeholder function to avoid syntax errors if no functions are provided
-            class_code += "    pass\n"
-
-        return class_code
+    def compile(self, types_json: dict[str, dict[str, str | None]]) -> TypeForest:
+        pending = set(types_json.keys())
+        while pending:
+            progress = False
+            for tname in list(pending):
+                parent = types_json[tname].get("parent")
+                if parent is None or parent in self.forest._nodes:
+                    # register the type under its parent (None for a root)
+                    self.forest.add_type(tname, parent)
+                    pending.remove(tname)
+                    progress = True
+            if not progress:
+                raise ValueError(
+                    f"Cyclic or missing parent reference in types JSON: {pending}"
+                )
+        return self.forest
 
 
 
 def main() -> None:
-    # Usage example
-    class_code1 = """
-    class MyClass1:
-        def __init__(self):
-            self.attribute = "Hello, world!"
-
-        def print_attribute(self):
-            print(self.attribute)
     """
-    # Create a ClassDeserializer
-    deserializer = ColorDeserializer()
+    Usage example: build and print a TypeForest for
+    LivingBeing -> {Human -> {Man, Woman}, Animal -> {Cat, Dog}}
+    Family
+    PolarMolecules -> {H2O -> {2_Hydrogen, 1_Oxygen}, HCl -> {1_Hydrogen, 1_Chloride}}
+    """
 
-    # Get an instance of the first class
-    instance1 = deserializer.get_instance(class_code1)
+    types_json = {
+        "LivingBeing": {"parent": None},
+        "Human":       {"parent": "LivingBeing"},
+        "Animal":      {"parent": "LivingBeing"},
+        "Man":         {"parent": "Human"},
+        "Woman":       {"parent": "Human"},
+        "Cat":         {"parent": "Animal"},
+        "Dog":         {"parent": "Animal"},
 
-    # Print the value of the attribute for the instance
-    instance1.print_attribute()  # Outputs: Hello, world!
+        "Family":      {"parent": None},
 
 
-if __name__ == '__main__':
+        "PolarMolecules":   {"parent": None},
+        "H2O":              {"parent": "PolarMolecules"},
+        "HCl":              {"parent": "PolarMolecules"},
+        "2_Hydrogen":       {"parent": "H2O"},
+        "1_Oxygen":         {"parent": "H2O"},
+        "1_Hydrogen":       {"parent": "HCl"},
+        "1_Chloride":       {"parent": "HCl"},
+
+    }
+
+    deserializer = TypeForestDeserializer()
+    forest = deserializer.compile(types_json)
+
+    # display each type and its parent
+    print("TypeForest:")
+    for type_name, node in forest._nodes.items():
+        parent_name = node.parent.name if node.parent is not None else None
+        print(f"  {type_name} has parent: {parent_name}")
+
+
+if __name__ == "__main__":
     main()
